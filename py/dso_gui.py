@@ -657,13 +657,12 @@ class App:
 
         f = srow("运行")
         self.btn_pause = tk.Button(f, text="暂停", command=self._toggle_pause)
-        self.btn_pause.pack(fill="x", padx=2, pady=1)
+        self.btn_pause.grid(row=0, column=0, padx=2, pady=0, sticky="ew")
 
-        f = srow("参数")
         self.btn_read = tk.Button(f, text="读取", command=self._read_all)
-        self.btn_read.grid(row=0, column=0, padx=2, pady=1, sticky="ew")
+        self.btn_read.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
         self.btn_save = tk.Button(f, text="保存设置", command=self._save)
-        self.btn_save.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
+        self.btn_save.grid(row=0, column=2, padx=2, pady=1, sticky="ew")
         f.columnconfigure(0, weight=1, uniform="pb"); f.columnconfigure(1, weight=1, uniform="pb")
 
         f = srow("导出")

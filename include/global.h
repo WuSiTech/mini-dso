@@ -63,7 +63,8 @@ extern bit InfoPage;
 extern bit CursorPage;
 extern bit CalPage;
 extern bit ShowSaveMsg;    /* 设置页: 显示保存成功 */
-extern bit ShowCancelMsg;  /* 设置页: 显示已取消修改 */      /* calibration table page */
+extern bit ShowCancelMsg;  /* 设置页: 显示已取消修改 */
+extern uint8 CancelExit;   /* 0=无 1=回设置列表 2=回主界面 */      /* calibration table page */
 extern uint8 CalSel;     /* current cal index 0..20 */
 /* ---- 新增(CPV 优化) ---- */
 extern __xdata uint8 CurA, CurB;      /* 光标 A/B 位置(0..159) */

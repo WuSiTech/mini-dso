@@ -217,7 +217,14 @@ static void Key_DoubleSettings(void)
     if (!InSettings)
         return;
 
-    Read_Options();
+    {
+        uint8 keepLang = Lang;
+        uint8 wasPage = (CalPage || InfoPage || CursorPage) ? 1 : 0;
+
+        Read_Options();              /* 参数 + 校准表回滚 */
+        Lang = keepLang;             /* 界面语言保持当前选择 */
+        CancelExit = wasPage ? 1 : 2; /* 子页 -> 回列表; 列表 -> 回主界面 */
+    }
     OptionChanged = 0;
     SettingsDirty = 1;
     CalPage = 0;

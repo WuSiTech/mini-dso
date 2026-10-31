@@ -294,6 +294,11 @@ void runWhenInSettrings()
             PlotSaveStatus(st);
             OLED_Display();
             Delay1000ms();
+
+            if (st == 2 && CancelExit == 2)
+                InSettings = 0;      /* 在设置列表里取消 -> 直接回主界面 */
+            CancelExit = 0;
+
             ClearDisplay = 1;
             DisplayUpdate = 1;
         }
@@ -685,8 +690,6 @@ void EC11_Poll(void)
 
     /* 记录"按下同时旋转"状态 */
     EC11PressAndRotate = !EC11_KEY;
-    if (EC11PressAndRotate)
-        Key_NoteRotate();       /* 按住旋转: 按键判定时不算点击 */
 
     d = EC11_DirTab[(uint8)((EC11_Prev << 2) | cur)];
     EC11_Prev = cur;
@@ -703,6 +706,10 @@ void EC11_Poll(void)
         EC11_Acc = 0;
         dt = (uint16)(AppMs - EncLastMs);
         EncLastMs = AppMs;
+
+        /* 只有真的转出一格, 才算"按住旋转"(避免按键时 A/B 抖动误判) */
+        if (EC11PressAndRotate)
+            Key_NoteRotate();
 
         /* 旋钮加速: 只对"纯数值"项(亮度/分压/方波频率/占空比)
            慢转(>120ms/格) 1 步, 中速(<=120ms) 2 步, 快转(<=50ms) 3 步

@@ -1027,7 +1027,7 @@ void PlotSettings()
                 break;
             case 8:
                 OLED_DrawCNStr(0, (uint8)y, S_WaveFreq);
-                OLED_Set_Pos(4 * CN_W + 2, (uint8)y);
+                OLED_Set_Pos(4 * CN_W + 2, (uint8)(y + 2));
                 switch (WaveFreqIdx)
                 {
                     case 0: OLED_DrawString("9Hz  "); break;

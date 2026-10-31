@@ -2,7 +2,7 @@
 # ??: powershell -File build.ps1
 $ErrorActionPreference = 'Continue'
 $ws = Split-Path -Parent $MyInvocation.MyCommand.Path
-$out = Join-Path $ws 'build\minidso_uart.hex'
+$out = Join-Path $ws 'build\wusi_minidso.hex'
 $obj = Join-Path $env:TEMP ('minidso_build_' + [guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Force (Join-Path $obj 'src'), (Join-Path $obj 'user') | Out-Null
 
@@ -29,6 +29,6 @@ if ($fail -ne 0) { Write-Host "????: $fail ???"; exit 1 }
       (Join-Path "$obj\user" 'main.rel') (Join-Path $obj 'minidso.lib') -o $out
 if ($LASTEXITCODE -ne 0) { Write-Host "????"; exit 1 }
 
-Copy-Item (Join-Path $obj 'minidso_uart.mem') (Join-Path $ws 'build\minidso_uart.mem') -Force
-Get-Content (Join-Path $obj 'minidso_uart.mem') | Select-String -Pattern 'ROM/EPROM|EXTERNAL RAM|Stack starts'
+Copy-Item (Join-Path $obj 'wusi_minidso.mem') (Join-Path $ws 'build\wusi_minidso.mem') -Force
+Get-Content (Join-Path $obj 'wusi_minidso.mem') | Select-String -Pattern 'ROM/EPROM|EXTERNAL RAM|Stack starts'
 Write-Host ("??: {0} ({1} ??, {2} ???)" -f $out, (Get-Item $out).Length, (Get-Content $out).Count)

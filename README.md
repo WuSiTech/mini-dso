@@ -1,4 +1,4 @@
-# Mini-DSO v1.7.10 — STC8A8K64D4 @ 45 MHz
+# Mini-DSO v1.7.17 — STC8A8K64D4 @ 45 MHz
 
 **中文** | [English](#english-version)
 
@@ -32,6 +32,26 @@
   + 波形滚动位置读写（0x1A/0x1B）+ 运行/暂停（0x1C）
 - 开机启动页 + 自检（EEPROM / 校准表 / 电池电压），烧录可软复位进 ISP
 
+
+### 校准与系数（全部存 EEPROM，设备上可改，无需重新烧录）
+
+| 位置 | 内容 |
+|---|---|
+| 设置 → 时基偏移表（26 项） | #0~#20 21 档采样延时；#21~#25 频率换算模型 A1/B1/A2/B2/THR |
+| 设置 → 输出波偏移表（28 项） | #0~#14 方波 15 档周期偏移；#15~#20 波形 6 档步进偏移；#21 生成器 tick TK；#22~#27 波形 6 档步进周期 WS |
+| EEPROM 实测表 DtTbl | 21 档真实采样间隔（0.01 µs），右上角频率读数的依据 |
+
+当前标定值：TK = 117，WS = [12281, 5799, 3229, 1559, 774, 395]，
+A1/B1/A2/B2/THR = 12955/1800/14258/1550/300。
+
+### 工具
+
+`ash
+python py\flash.py COM5 build\wusi_minidso.hex   # 烧录(自动写回校准数据)
+python py\dso_gui.py                            # 上位机(实时波形/FFT/光标/导出)
+python py\gen_cnfont.py                         # 重新生成中文字库
+`
+
 ### 来源与致谢
 
 - 原作：**CreativeLau** — https://github.com/CreativeLau/Mini-DSO
@@ -55,7 +75,7 @@
 
 ### 快速上手
 
-1. 烧录 `build/minidso_uart.hex`（见下方"烧录"）
+1. 烧录 `build/wusi_minidso.hex`（见下方"烧录"）
 2. 上电 → 启动页显示 LOGO 和自检结果 → 自动进主界面
 3. 把待测信号接到输入分压端（P0.1 通道）
 4. 旋转旋钮调时基/量程，按住旋钮再旋转可切换要调的项目
@@ -234,17 +254,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 
 ### 烧录
 
-- **STC-ISP**：芯片 STC8A8K64D4，IRC 45 MHz，打开 `build/minidso_uart.hex`，
+- **STC-ISP**：芯片 STC8A8K64D4，IRC 45 MHz，打开 `build/wusi_minidso.hex`，
   点下载后**断电再上电**
-- **命令行**：`python -m stcgal -P stc8d -p COM5 build/minidso_uart.hex`（需冷启动）
-- **运行中自动烧录**：`python py\flash.py COM5 build\minidso_uart.hex`
+- **命令行**：`python -m stcgal -P stc8d -p COM5 build/wusi_minidso.hex`（需冷启动）
+- **运行中自动烧录**：`python py\flash.py COM5 build\wusi_minidso.hex`
   （固件收到 `0x14` 后软复位进 ISP）
 
 > 烧录会整片擦除 EEPROM：设置和校准表回到默认值。
-> 烧完执行 `python py\restore_all.py` 一键写回实测 CalTable 与 DtTbl（数据在 `build/dtcal.json`）。
 >
 > **EEPROM 大小**：默认下载选项 `program_eeprom_split=65024` 只有 0.5 KB；本项目改成
-> **1 KB**：`python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\minidso_uart.hex`。
+> **1 KB**：`python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\wusi_minidso.hex`。
 
 ### 串口协议
 
@@ -275,7 +294,6 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 | 0x18 | PC→DSO | 读 IAP 地址 16 字节（诊断用，`[0..1]=地址`） |
 
 > DtTbl 是频率读数的查表值：烧录/擦除后为空，可用 `python py\dtt.py --nominal`
-> 按延时模型填标称值，或用 `python py\dtcal.py --all` 用 STM32 基准逐档实测写入。
 
 
 参数块（22 B）：`Lsb(u16) PlotMode ScaleH ScaleV_Auto RulerVMax(u16) RulerVMin(u16)
@@ -289,8 +307,7 @@ mini-dso/
 ├─ src/            固件源码
 ├─ include/        头文件（cnfont.h 中文字模、bmp.h LOGO、keys.h …）
 ├─ user/main.c     主程序 + 中断 + 主循环
-├─ build/          minidso.hex（原版）/ minidso_uart.hex（当前 v1.4.1）
-├─ py/             上位机与工具（dso_gui.py / flash.py / dtcal.py / dtt.py / restore_all.py / refgen/）
+├─ build/          minidso.hex（原版）/ wusi_minidso.hex（当前 v1.4.1）
 ├─ build.ps1       一键编译
 └─ README.md
 ```
@@ -442,9 +459,9 @@ Current usage (v1.4.1): ROM 38,693 / 64,512 B, XRAM 3,558 / 8,192 B, stack 217 B
 
 ### Flash
 
-- STC-ISP: chip STC8A8K64D4, IRC 45 MHz, `build/minidso_uart.hex`, power-cycle to download
-- `python -m stcgal -P stc8d -p COM5 build/minidso_uart.hex`
-- `python py\flash.py COM5 build\minidso_uart.hex` (firmware jumps to ISP by itself)
+- STC-ISP: chip STC8A8K64D4, IRC 45 MHz, `build/wusi_minidso.hex`, power-cycle to download
+- `python -m stcgal -P stc8d -p COM5 build/wusi_minidso.hex`
+- `python py\flash.py COM5 build\wusi_minidso.hex` (firmware jumps to ISP by itself)
 
 Flashing erases the whole EEPROM (settings and calibration table).
 

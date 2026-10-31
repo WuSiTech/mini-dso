@@ -3,9 +3,9 @@
 """自动烧录 + 烧后恢复 EEPROM 校准数据。
 
 用法:
-  python py/flash.py                        # COM5 + build/minidso_uart.hex
+  python py/flash.py                        # COM5 + build/wusi_minidso.hex
   python py/flash.py COM5                    # 指定串口
-  python py/flash.py COM5 build/minidso_uart.hex
+  python py/flash.py COM5 build/wusi_minidso.hex
   python py/flash.py --cold                  # 跳过 0x14 软复位, 直接等拔插冷启动
   python py/flash.py --split 63488           # EEPROM 设成 2KB (默认 64512 = 1KB)
   python py/flash.py --no-restore            # 烧完不写回校准表
@@ -33,7 +33,7 @@ SCRIPT_DIR = "py"
 def parse_args():
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("port", nargs="?", default="COM5")
-    ap.add_argument("hex", nargs="?", default="build/minidso_uart.hex")
+    ap.add_argument("hex", nargs="?", default="build/wusi_minidso.hex")
     ap.add_argument("--split", type=int, default=DEFAULT_SPLIT,
                     help="program_eeprom_split, EEPROM=65536-split (默认 %d = 1KB)" % DEFAULT_SPLIT)
     ap.add_argument("--cold", action="store_true", help="跳过 0x14 软复位, 直接等冷启动")

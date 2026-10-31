@@ -214,6 +214,9 @@ static void Key_Single(void)
     ADCRunning = !ADCRunning;
     if (ADCRunning)
     {
+        /* 恢复运行后"滚动位置"这一项已不存在, 不能停在这个编号上 */
+        if (OptionInChart == 5)
+            OptionInChart = 1;
         /* 恢复: 保留旧波形不清屏(慢时基一轮 4.4s, 空白会以为没反应),
            状态栏立即变成 Run, 扫描完成后再刷新波形 */
         WaveUpdate = 0;
@@ -231,7 +234,8 @@ static void Key_Single(void)
     IE1 = 0;
 }
 
-/* 设置页里连按两下: 放弃修改, 从 EEPROM 重新读取(参数 + 校准表) */
+/* 设置页里连按两下: 放弃修改, 从 EEPROM 重新读取(参数 + 校准表),
+   然后回到设置列表(子页也回列表), 不退出到主界面 */
 static void Key_DoubleSettings(void)
 {
     if (!InSettings)
@@ -239,15 +243,14 @@ static void Key_DoubleSettings(void)
 
     {
         uint8 keepLang = Lang;
-        uint8 wasPage = (CalPage || InfoPage || CursorPage) ? 1 : 0;
 
         Read_Options();              /* 参数 + 校准表回滚 */
         Lang = keepLang;             /* 界面语言保持当前选择 */
-        CancelExit = wasPage ? 1 : 2; /* 子页 -> 回列表; 列表 -> 回主界面 */
     }
     OptionChanged = 0;
     SettingsDirty = 1;
     CalPage = 0;
+    OutCalPage = 0;
     InfoPage = 0;
     CursorPage = 0;
     ShowCancelMsg = 1;

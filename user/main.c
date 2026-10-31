@@ -205,7 +205,7 @@ void init()
 {
     InSettings = 0;         //初始化开机界面
     OptionInSettings = 0;   //初始化设置界面的选项编号
-    OptionInChart = 0;      //初始化主界面的选项标号
+    OptionInChart = 1;      //初始化主界面的选项标号(1 = 图像最大值, 轮换顺序的第一项)
     WaveScroll = 0;         //清零波形滚动标志
     OptionChanged = 0;      //清零设置修改标志
     ADCRunning = 1;         //置位采样标志
@@ -295,10 +295,7 @@ void runWhenInSettrings()
             OLED_Display();
             Delay1000ms();
 
-            if (st == 2 && CancelExit == 2)
-                InSettings = 0;      /* 在设置列表里取消 -> 直接回主界面 */
-            CancelExit = 0;
-
+            /* 双击取消只回到设置列表, 不再退出到主界面; 长按才是退出 */
             ClearDisplay = 1;
             DisplayUpdate = 1;
         }

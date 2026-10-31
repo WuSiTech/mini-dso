@@ -456,6 +456,9 @@ void OLED_DrawVLine(uint8 x, uint8 y, uint8 w)
     if (x > WIDTH - 1)
         x = WIDTH - 1;
 
+    if (y >= HEIGHT)          /* 起点越界: 直接丢弃, 防止宽度下溢写坏其它行 */
+        return;
+
     if (y + w > HEIGHT)
         w = HEIGHT - y;
 
@@ -481,6 +484,9 @@ void OLED_DrawHLine(uint8 x, uint8 y, uint8 w)
 {
     uint8 *pBuf;
     uint8 mask;
+
+    if (x >= WIDTH)           /* 起点越界: 直接丢弃, 防止宽度下溢写坏其它页 */
+        return;
 
     if (x + w > WIDTH)
         w = WIDTH - x;

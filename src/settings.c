@@ -222,21 +222,40 @@ void change_TriPosOffset(bit i)
     }
 }
 
+/* 主界面按住旋转的轮换顺序:
+   图像最大值(1) -> 滚动条(5, 仅暂停时) -> 时基(0) -> 触发电平(2) -> 触发沿(3) -> 触发方式(4)
+   运行中没有"滚动条", 此时顺序为 1 -> 0 -> 2 -> 3 -> 4 */
 void change_OptionInChart(bit i)
 {
-    int8 maxopt = ADCRunning ? 4 : 5;   /* 暂停时多一个"滚动位置" */
-
     if (i)
     {
-        OptionInChart++;
-        if (OptionInChart > maxopt)
+        if (OptionInChart == 1)             /* 图像最大值 -> 滚动条 / 时基 */
+            OptionInChart = ADCRunning ? 0 : 5;
+        else if (OptionInChart == 5)        /* 滚动条 -> 时基 */
             OptionInChart = 0;
+        else if (OptionInChart == 0)        /* 时基 -> 触发电平 */
+            OptionInChart = 2;
+        else if (OptionInChart == 2)        /* 触发电平 -> 触发沿 */
+            OptionInChart = 3;
+        else if (OptionInChart == 3)        /* 触发沿 -> 触发方式 */
+            OptionInChart = 4;
+        else                                /* 触发方式 -> 图像最大值 */
+            OptionInChart = 1;
     }
     else
     {
-        OptionInChart--;
-        if (OptionInChart < 0)
-            OptionInChart = maxopt;
+        if (OptionInChart == 1)             /* 图像最大值 <- 触发方式 */
+            OptionInChart = 4;
+        else if (OptionInChart == 4)        /* 触发方式 <- 触发沿 */
+            OptionInChart = 3;
+        else if (OptionInChart == 3)        /* 触发沿 <- 触发电平 */
+            OptionInChart = 2;
+        else if (OptionInChart == 2)        /* 触发电平 <- 时基 */
+            OptionInChart = 0;
+        else if (OptionInChart == 0)        /* 时基 <- 滚动条 / 图像最大值 */
+            OptionInChart = ADCRunning ? 1 : 5;
+        else                                /* 滚动条 -> 图像最大值 */
+            OptionInChart = 1;
     }
     ClearDisplay = 1;      /* 整屏重绘: 不让上一个选中光标留下残影 */
     DisplayUpdate = 1;
@@ -841,7 +860,7 @@ void check_Options()
 }
 
 /* EEPROM 一个扇区 512 字节, 擦除是整扇区, 所以设置和校准表必须一起写
-   布局: [0..17] 设置  [18..31] 0xFF  [32..33] 'C','L'  [34..75] 校准表(21x16bit LE)  [76] 校验和 */
+   布局: [0..21] 设置  [22..31] 0xFF  [32..33] 'C','L'  [34..75] 校准表(21x16bit LE)  [76] 校验和 */
 static __xdata uint8 EeBuf[288];
 
 /* 参数无效(新片/擦除后)时载入的默认值: 两个波形输出都关 */
@@ -902,9 +921,10 @@ bit Save_Options()
     *p++ = GenFreqIdx;
     *p++ = GenDuty;
     *p++ = WaveType;
-    *p = Lang;
+    *p = Lang;                 /* EeBuf[21]: 语言 */
 
-    for (i = 21; i < 32; i++)
+    /* 参数块占 0..21(Lang 在 21), 0xFF 填充从 22 开始, 否则会把 Lang 冲掉 */
+    for (i = 22; i < 32; i++)
         EeBuf[i] = 0xFF;
     EeBuf[32] = 'C';
     EeBuf[33] = 'L';

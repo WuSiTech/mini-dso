@@ -76,7 +76,6 @@ extern bit CursorPage;
 extern bit CalPage;
 extern bit ShowSaveMsg;    /* 设置页: 显示保存成功 */
 extern bit ShowCancelMsg;  /* 设置页: 显示已取消修改 */
-extern uint8 CancelExit;   /* 0=无 1=回设置列表 2=回主界面 */      /* calibration table page */
 extern uint8 CalSel;     /* current cal index 0..20 */
 /* ---- 新增(CPV 优化) ---- */
 extern __xdata uint8 CurA, CurB;      /* 光标 A/B 位置(0..159) */
@@ -86,8 +85,8 @@ extern bit PostEepromOk, PostCalOk, PostBgvOk;   /* 开机自检结果 */
 #define GEN_TICK_US10 120   /* 信号源 1 tick = 12.0us (实测) */
 
 #define FW_VER_MAJOR 1
-#define FW_VER_MINOR 7
-#define FW_VER_PATCH 16
+#define FW_VER_MINOR 8
+#define FW_VER_PATCH 1
 #define FW_VERSION ((FW_VER_MAJOR << 8) | (FW_VER_MINOR << 4) | FW_VER_PATCH)
 
 extern __xdata uint8 InfoSel;   /* 信息页选中项: 0作者 1开发 2返回 */   /* 1: 正在显示创作者信息页 */        // P1.0 波形类型: 0正弦 1三角 2锯齿

@@ -29,6 +29,6 @@ if ($fail -ne 0) { Write-Host "????: $fail ???"; exit 1 }
       (Join-Path "$obj\user" 'main.rel') (Join-Path $obj 'minidso.lib') -o $out
 if ($LASTEXITCODE -ne 0) { Write-Host "????"; exit 1 }
 
-Copy-Item (Join-Path $obj 'wusi_minidso.mem') (Join-Path $ws 'build\wusi_minidso.mem') -Force
-Get-Content (Join-Path $obj 'wusi_minidso.mem') | Select-String -Pattern 'ROM/EPROM|EXTERNAL RAM|Stack starts'
+$mem = Join-Path $ws 'build\wusi_minidso.mem'
+Get-Content $mem | Select-String -Pattern 'ROM/EPROM|EXTERNAL RAM|Stack starts'
 Write-Host ("??: {0} ({1} ??, {2} ???)" -f $out, (Get-Item $out).Length, (Get-Content $out).Count)

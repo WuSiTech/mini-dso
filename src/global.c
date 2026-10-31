@@ -70,7 +70,6 @@ __xdata uint8 CurA = 40, CurB = 110;
 bit CalPage = 0;
 bit ShowSaveMsg = 0;
 bit ShowCancelMsg = 0;
-uint8 CancelExit = 0;
 uint8 CalSel = 0;
 bit CurSel = 0;
 bit EepromValid = 0;
@@ -82,7 +81,7 @@ __xdata uint8 GenPre = 1;
  /* 时基校准表: 0-14 为 DelayUs 的 us 值, 15-19 为 0.25us 单位 */  //cpv - 250us 计数(设置页轮播用)   //cpv - 测试方波模式超时计数(10s 后自动恢复正常输出)                                          //cpv - 参数被修改(通知上位机)
 __xdata int8 ScaleH = 4;                                           //时间区间，0-20对应500ms-70us
 __xdata int8 OptionInSettings;                                     //设置界面的选项序号, 0:TriS, 1:PlotMode, 2:LSB
-__xdata int8 OptionInChart;                                        //主界面的选项序号, 0:ScaleH, 1:ScaleV, 2:TriLevel, 3:TriSlope, 4:TriMode
+__xdata int8 OptionInChart;                                        //主界面的选项序号, 0:ScaleH, 1:ScaleV, 2:TriLevel, 3:TriSlope, 4:TriMode, 5:滚动位置(仅暂停); 轮换顺序 1->[5]->0->2->3->4
 __xdata int8 TriMode;                                              //触发方式，2:单次 1：普通，0：自动
                                                            //自动模式:连续采样，用户手动停止
                                                            //普通：触发后停止采样，并自动等待下次触发

@@ -607,7 +607,9 @@ void PlotChart(void)
 
         /* 图表虚线网格
            Grid of chart */
-        for (i = 0; i < 16; i++)
+        /* 只画 15 段: 第 16 段起点 26+7*15=131 越界, 会让 OLED_DrawHLine
+           的宽度下溢并写进下面两行, 屏幕上就是两条多余的长横线 */
+        for (i = 0; i < 15; i++)
         {
             OLED_DrawHLine(CHART_H_MIN + 7 * i, CHART_V_MIN + ((CHART_V_MAX - CHART_V_MIN) >> 1), 3);
         }
@@ -875,6 +877,10 @@ static const uint8 *code GenFreqName[15] = {
     "1Hz", "2Hz", "5Hz", "10Hz", "20Hz", "50Hz", "100Hz", "200Hz",
     "500Hz", "1kHz", "2kHz", "5kHz", "10kHz", "17kHz", "42kHz"
 };
+/* 波形输出(正弦/三角/锯齿) 6 档频率简称 */
+static const uint8 *code WaveFreqName[6] = {
+    "9Hz", "18Hz", "35Hz", "70Hz", "141Hz", "282Hz"
+};
 static const uint8 *code WaveTypeName[3] = {"Sine", "Tri ", "Saw "};
 
 static void DrawNumRight(uint32 v, uint8 width)
@@ -1005,15 +1011,7 @@ void PlotSettings()
             case 8:
                 OLED_DrawCNStr(0, (uint8)y, S_WaveFreq);
                 OLED_Set_Pos(4 * CN_W + 2, (uint8)(y + 2));
-                switch (WaveFreqIdx)
-                {
-                    case 0: OLED_DrawString("9Hz  "); break;
-                    case 1: OLED_DrawString("18Hz "); break;
-                    case 2: OLED_DrawString("35Hz "); break;
-                    case 3: OLED_DrawString("70Hz "); break;
-                    case 4: OLED_DrawString("141Hz"); break;
-                    default: OLED_DrawString("282Hz"); break;
-                }
+                OLED_DrawString(WaveFreqName[WaveFreqIdx > 5 ? 0 : WaveFreqIdx]);
                 break;
             case 9:
                 OLED_DrawCNStr(0, (uint8)y, S_UartOut);
@@ -1093,16 +1091,7 @@ void PlotSettings()
             case 5: OLED_DrawString("PWM Duty="); if (GenDuty < 10) OLED_DrawString("0"); OLED_DrawNum(GenDuty, 2); OLED_DrawString("%"); break;
             case 6: OLED_DrawString("Wave Out="); OLED_DrawString(OutSIN ? "ON " : "OFF"); break;
             case 7: OLED_DrawString("Wave Type="); OLED_DrawString(WaveTypeName[WaveType > 2 ? 0 : WaveType]); break;
-            case 8: OLED_DrawString("Wave freq=");
-                      switch (WaveFreqIdx) {
-                        case 0: OLED_DrawString("9Hz"); break;
-                        case 1: OLED_DrawString("18Hz"); break;
-                        case 2: OLED_DrawString("35Hz"); break;
-                        case 3: OLED_DrawString("70Hz"); break;
-                        case 4: OLED_DrawString("141Hz"); break;
-                        default: OLED_DrawString("282Hz"); break;
-                      }
-                      break;
+            case 8: OLED_DrawString("Wave freq="); OLED_DrawString(WaveFreqName[WaveFreqIdx > 5 ? 0 : WaveFreqIdx]); break;
             case 9: OLED_DrawString("UART Out="); OLED_DrawString(OutUART ? "ON " : "OFF"); break;
             case 10: OLED_DrawString("Language="); OLED_DrawString(Lang ? "CN" : "EN"); break;
             case 11: OLED_DrawString("Cursor >"); break;
@@ -1176,7 +1165,7 @@ static void DrawMarqueeRow(uint8 y, uint8 *str, uint8 offset)
     }
 }
 
-/* output wave offset table page: 21 entries */
+/* output wave offset table page: 26 entries (#0..#25) */
 void PlotOutCalPage(void)
 {
     uint8 slot, idx, base;
@@ -1193,6 +1182,46 @@ void PlotOutCalPage(void)
     OLED_DrawString("OUT ");
     OLED_DrawNum(OutCalSel, NumDigits(OutCalSel));
     OLED_DrawString("/25 ");
+
+    /* 右上角分组简称(与 OUT n/25 同一行, 行内容不变):
+       #0~#14 方波档 -> SQ<频率>   #15~#20 波形档 -> SIN<频率>
+       #21 TK  #22~#25 WS1..WS4 */
+    {
+        uint8 pre[4];
+        uint8 plen, tlen, x;
+        const uint8 *p;
+
+        p = 0;
+        if (OutCalSel < 15)
+        {
+            pre[0] = 'S'; pre[1] = 'Q'; pre[2] = 0;
+            p = GenFreqName[OutCalSel];
+        }
+        else if (OutCalSel < 21)
+        {
+            pre[0] = 'S'; pre[1] = 'I'; pre[2] = 'N'; pre[3] = 0;
+            p = WaveFreqName[OutCalSel - 15];
+        }
+        else if (OutCalSel == 21)
+        {
+            pre[0] = 'T'; pre[1] = 'K'; pre[2] = 0;
+        }
+        else
+        {
+            pre[0] = 'W'; pre[1] = 'S'; pre[2] = (uint8)('1' + (OutCalSel - 22)); pre[3] = 0;
+        }
+
+        plen = (uint8)strlen((const char *)pre);
+        tlen = p ? (uint8)strlen((const char *)p) : 0;
+        x = (uint8)(WIDTH - 2 - (plen + tlen) * 6);   /* 右对齐到第 126 列 */
+        OLED_Set_Pos(x, 0);
+        OLED_DrawString(pre);
+        if (p)
+        {
+            OLED_Set_Pos((uint8)(x + plen * 6), 0);
+            OLED_DrawString((uint8 *)p);
+        }
+    }
 
     base = (OutCalSel > 2) ? (uint8)(OutCalSel - 2) : 0;
     for (slot = 0; slot < 5; slot++)
@@ -1350,12 +1379,12 @@ void PlotInfoPage(void)
         {
             OLED_DrawCNStr(0, 40, S_Proj);
             OLED_Set_Pos(6 * CN_W + 2, 42);
-            OLED_DrawString("(v1.4.1)");
+            OLED_DrawString("(v1.8.1)");
         }
         else
         {
             OLED_Set_Pos(0, 42);
-            OLED_DrawString("PROJ:(v1.4.1)");
+            OLED_DrawString("PROJ:(v1.8.1)");
         }
     }
     OLED_Reverse(0);

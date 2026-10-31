@@ -106,20 +106,23 @@
 #### 光标测量页
 
 进入：设置页滚到「光标测量」，**再旋转一格**进入。
+进入后采样暂停，画面停在最后一帧上，方便对照测量。
 
 | 操作 | 作用 |
 |---|---|
-| 旋转 | 左右移动当前光标（限制在图表 100 列内） |
-| 按住 + 旋转 | 切换选中 A / B（选中的是实线，另一个虚线） |
-| 短按 / 长按 | 返回设置页 |
+| 旋转 | 左右移动**当前选中的**光标（范围 0~99，即图表 100 列内；每次移动整屏重绘，不留残影） |
+| 按住 + 旋转 | 切换选中的是 A 还是 B（选中那条是实线，另一条虚线） |
+| 短按 | 返回设置列表 |
+| 长按 | 返回设置列表（等同短按） |
 
 屏幕**最底一行**显示 `dT:xxx us/ms  dV:x.xx V`（取代原来的电压范围/时基信息）。
+`dT` = 两条光标的时间差，`dV` = 两条光标处的电压差。
 
 #### 创作者信息页
 
 进入：设置页滚到「创作者信息」，再旋转一格进入。
 页面显示 LOGO、原作、开发、项目地址；`按住 + 旋转` 选择条目，
-`旋转` 显示对应网址（长网址自动轮播），选到 `<Back` 旋转即返回；长按直接退回。
+`旋转` 显示对应网址（长网址自动轮播），选到 `<Back` 旋转即返回；**短按或长按**都直接退回设置列表。
 
 #### 校准表页
 
@@ -130,6 +133,7 @@
 |---|---|
 | 按住 + 旋转 | 切换要调的档位（0~20） |
 | 旋转 | 微调该档校准值（慢转 ±1，快速转 ±8） |
+| 短按 | 回设置列表（改动在退出设置时统一保存） |
 | 长按 | **立即写 EEPROM 并提示保存成功**，然后回设置列表 |
 
 这就是上位机「一键校准」写的那张表（21 档延时/偏移量），设备上也能直接看和改。
@@ -323,8 +327,16 @@ Encoder acceleration applies only to the four numeric items (brightness, LSB,
 PWM frequency, duty): 1 step slow, 2 steps ≤120 ms, 3 steps ≤50 ms.
 
 Cursor page: enter from settings (select “Cursor”, rotate once more).
-Rotate = move cursor, press+rotate = switch A/B, short/long press = back.
-`dT` / `dV` are shown in the bottom line.
+Sampling stops while the page is open, so the trace is frozen on the last frame.
+
+| Action | Function |
+|---|---|
+| Rotate | Move the **currently selected** cursor (range 0~99, i.e. inside the 100-column chart; full redraw each step, no residue) |
+| Press + rotate | Switch selection between A and B (selected one is solid, the other dashed) |
+| Short press | Back to the settings list |
+| Long press | Back to the settings list |
+
+The bottom line shows `dT` (time difference) and `dV` (voltage difference).
 
 Creator info page: select “Dev-er Info” then rotate to open; press+rotate selects
 Original / Developer / Project URL / `<Back`; rotate shows the corresponding URL
@@ -333,6 +345,7 @@ Original / Developer / Project URL / `<Back`; rotate shows the corresponding URL
 Calibration table page: select “Cal table” then rotate to open. Shows `CAL n/20` plus the
 matching time base and 5 entries (`#index  value`, selected row inverted).
 Press+rotate = choose index, rotate = adjust value (slow ±1, fast ±8),
+short press = back to the list (saved when leaving settings),
 long press = **write EEPROM immediately (save message)** and go back to the settings list.
 
 ### Controls (PC host, `py/dso_gui.py`)

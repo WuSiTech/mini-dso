@@ -600,7 +600,7 @@ void OLED_DrawString_ScaleHTxt(int8 _ScaleH)
   else if (_ScaleH==16) OLED_DrawString("300us"); //16
   else if (_ScaleH==17) OLED_DrawString("200us"); //17
   else if (_ScaleH==18) OLED_DrawString("150us"); //18
-  else if (_ScaleH==19) OLED_DrawString("155us"); //19
+  else if (_ScaleH==19) OLED_DrawString("100us"); //19
   else if (_ScaleH==20) OLED_DrawString("80us"); //20
   else               OLED_DrawString("---us");  // out of bounds
 }
@@ -1093,7 +1093,7 @@ static void FillRowBand(uint8 y, bit white)
 /* 每档每采样点的间隔(us) */
 static const uint16 code TB_DT_US[21] = {
     20000, 12000, 8000, 6000, 4000, 2000, 1200, 800, 600, 400,
-    200, 120, 80, 60, 40, 20, 12, 8, 6, 6, 3
+    200, 120, 80, 60, 40, 20, 12, 8, 6, 4, 3
 };
 
 static uint8 NumDigits(uint16 v)

@@ -191,9 +191,11 @@ void switch_Dealy(uint8 scale_h)
     if (scale_h > 20)
         return;
     v = CalTable[scale_h];
-    if (!v)
+    if (!v && scale_h != 19)
         return;
-    if (scale_h >= 15)
+    if (scale_h == 19)               /* 100us 档: ADC 开销 ~3.2us + DelayUs(us) */
+        DelayUs(v ? v : 1);
+    else if (scale_h >= 15)
         DelayFine(v); /* 快档: 0.25us 步进, 精度更高 */
     else
         DelayUs(v);

@@ -588,6 +588,8 @@ class App:
         self.btn_cur = tk.Button(bgrid, text="光标", command=self._toggle_cursors)
         self.btn_cur.grid(row=2, column=1, padx=2, pady=2, sticky="ew")
         self.btn_outcal = tk.Button(bgrid, text="输出波偏移", command=self._open_outcal)
+        self.btn_tbcal = tk.Button(bgrid, text="声卡校时基", command=self._audio_tb_calibrate)
+        self.btn_tbcal.grid(row=4, column=0, columnspan=3, padx=2, pady=2, sticky="ew")
         self.btn_outcal.grid(row=3, column=0, columnspan=3, padx=2, pady=2, sticky="ew")
         self.btn_cal = tk.Button(bgrid, text="时基校准", command=self._calibrate)
         self.btn_cal.grid(row=2, column=2, padx=2, pady=2, sticky="ew")
@@ -1266,6 +1268,132 @@ class App:
                 self._tmsg("声卡校准失败: %r" % (e,))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    # ---------------- 声卡当标准信号源, 校准时基(绝对) ----------------
+    def _audio_tb_calibrate(self):
+        if not (self.link and not self.demo):
+            self._msg("请先连接设备")
+            return
+        try:
+            import sounddevice  # noqa: F401
+            import numpy  # noqa: F401
+        except Exception:
+            self._msg("需要 sounddevice + numpy: pip install sounddevice numpy")
+            return
+        port = self.port_var.get().strip()
+        try:
+            baud = int(self.baud_var.get() or 115200)
+        except Exception:
+            baud = 115200
+        self._tmsg("声卡校时基: 开始(电脑耳机输出 -> 示波器 INPUT, 播放 1kHz)")
+        threading.Thread(target=self._audio_tb_worker, args=(port, baud), daemon=True).start()
+
+    def _audio_tb_worker(self, port, baud):
+        import numpy as np
+        import sounddevice as sd
+
+        T_CAL_W, T_CAL_R = 0x16, 0x17
+        f_true = 1000.0
+        try:
+            if self.link:
+                self.link.close()
+                self.link = None
+            ser = serial.Serial(port, baud, timeout=0.05)
+            parser = FrameParser()
+
+            def read_frames(sec=0.5):
+                out = []
+                t0 = time.time()
+                while time.time() - t0 < sec:
+                    d = ser.read(512)
+                    if d:
+                        out += parser.feed(d)
+                return out
+
+            def req(typ, payload=b"", sec=0.8):
+                ser.write(build_frame(typ, payload))
+                time.sleep(0.05)
+                return read_frames(sec)
+
+            tbl = None
+            for t, pl in req(T_CAL_R, sec=1.5):
+                if t == T_CAL_R and len(pl) == 42:
+                    tbl = [pl[i * 2] | (pl[i * 2 + 1] << 8) for i in range(21)]
+            if tbl is None:
+                self._tmsg("读不到时基表(0x17), 中止")
+                ser.close()
+                return
+
+            cur = None
+            for t, pl in req(0x12):
+                if t == 0x03 and len(pl) >= SETTINGS_LEN:
+                    cur = settings_from_bytes(pl)
+            if cur is None:
+                self._tmsg("读参数失败, 中止")
+                ser.close()
+                return
+            cur["trimode"] = 0
+            cur["scalev_auto"] = 1
+
+            fs = 48000
+            tone = (0.5 * np.sin(2 * np.pi * f_true * np.arange(int(fs * 1.5)) / fs)).astype("float32")
+
+            ratios = []
+            for idx in (15, 14):        # 500us/div, 1ms/div: 1kHz 分别约 4.4 / 8.8 个周期
+                cur["scaleh"] = idx
+                ser.write(build_frame(T_SET, settings_to_bytes(cur)))
+                read_frames(1.2)
+                sd.play(tone, fs)
+                frames = read_frames(1.2)
+                sd.stop()
+                sd.wait()
+                f_dso = 0.0
+                for t, pl in frames:
+                    if t == 0x01:
+                        sp = parse_sample(pl)
+                        if sp and sp.get("freq"):
+                            f_dso = float(sp["freq"])
+                self._tmsg("  时基档 %d: 设备测得 %.2fHz (真值 %.0fHz)" % (idx, f_dso, f_true))
+                if f_dso > 0 and f_true * 0.5 < f_dso < f_true * 2.0:
+                    ratios.append(f_dso / f_true)
+
+            if not ratios:
+                self._tmsg("没测到 1kHz 信号: 检查耳机线是否接到 INPUT / 音量, 未修改时基表")
+                ser.close()
+                return
+            r = sum(ratios) / len(ratios)
+            if abs(r - 1.0) > 0.05:
+                self._tmsg("偏差 %.2f%% 过大, 中止(检查接线/音量)" % ((r - 1) * 100))
+                ser.close()
+                return
+            new = [max(1, int(round(v * r))) for v in tbl]
+            pay = b"".join(bytes([v & 0xFF, (v >> 8) & 0xFF]) for v in new)
+            ok = 0
+            for t, pl in req(T_CAL_W, pay, 2.0):
+                if t == 0x02:
+                    ok = pl[1] if len(pl) >= 2 else 0
+            ser.write(build_frame(0x11))
+            read_frames(1.5)
+
+            # 复测
+            cur["scaleh"] = 15
+            ser.write(build_frame(T_SET, settings_to_bytes(cur)))
+            read_frames(1.0)
+            sd.play(tone, fs)
+            frames = read_frames(1.2)
+            sd.stop()
+            sd.wait()
+            f2 = 0.0
+            for t, pl in frames:
+                if t == 0x01:
+                    sp = parse_sample(pl)
+                    if sp and sp.get("freq"):
+                        f2 = float(sp["freq"])
+            self._tmsg("时基校准完成: 比例 %.4f, 写入 %s, 复测 %.2fHz(误差 %+.3f%%)"
+                       % (r, "成功" if ok else "失败", f2, (f2 / f_true - 1) * 100 if f2 else 0))
+            ser.close()
+        except Exception as e:
+            self._tmsg("声卡校时基失败: %r" % (e,))
 
     def _read_out_off(self):
         """同步读输出偏移表(阻塞等待 0x1D 回复)"""

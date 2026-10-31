@@ -1677,11 +1677,16 @@ class App:
         try:
             self.root.update()
             if HAVE_PIL:
-                x = self.canvas.winfo_rootx()
-                y = self.canvas.winfo_rooty()
-                w = self.canvas.winfo_width()
-                h = self.canvas.winfo_height()
-                ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(path)
+                try:
+                    sc = float(self.root.winfo_fpixels("1i")) / 96.0
+                except Exception:
+                    sc = 1.0
+                x = int(round(self.canvas.winfo_rootx() * sc))
+                y = int(round(self.canvas.winfo_rooty() * sc))
+                w = max(1, int(round(self.canvas.winfo_width() * sc)))
+                h = max(1, int(round(self.canvas.winfo_height() * sc)))
+                img = ImageGrab.grab(bbox=(x, y, x + w, y + h), all_screens=True)
+                img.save(path)
                 self._msg("截图已保存: %s" % os.path.basename(path))
             else:
                 ps = path + ".ps"

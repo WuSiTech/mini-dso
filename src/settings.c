@@ -29,6 +29,32 @@
 #include "keys.h"
 
 /* waveform frequency divider: ISR 72.1kHz / div / 64 points -> 8.8/17.6/35/70/141/282 Hz */
+/* default per-range sample interval from the delay model (0.01us) */
+void DtTbl_Defaults(void)
+{
+    uint8 i2;
+    uint32 nominal;
+
+    for (i2 = 0; i2 < 21; i2++)
+    {
+        if (i2 == 15) nominal = 2000UL;
+        else if (i2 == 16) nominal = 1200UL;
+        else if (i2 == 17) nominal = 800UL;
+        else if (i2 == 18) nominal = 600UL;
+        else if (i2 == 20) nominal = 320UL;
+        else if (i2 == 19) nominal = 400UL;
+        else
+        {
+            uint16 cc = CalTable[i2];
+            if (cc >= DtThr)
+                nominal = ((uint32)cc * (uint32)DtA1) / 100UL + (uint32)DtB1;
+            else
+                nominal = ((uint32)cc * (uint32)DtA2) / 100UL + (uint32)DtB2;
+        }
+        DtTbl[i2] = nominal;
+    }
+}
+
 static const uint8 code WaveDivTab[6] = {128, 64, 32, 16, 8, 4};
 /* nominal table-step period (0.1us) for 8.8/17.6/35/70/141/282 Hz (64 points) */
 static const uint16 code WaveStepNom[6] = {17760, 8880, 4440, 2220, 1110, 555};
@@ -817,7 +843,7 @@ void check_Options()
 
 /* EEPROM 一个扇区 512 字节, 擦除是整扇区, 所以设置和校准表必须一起写
    布局: [0..17] 设置  [18..31] 0xFF  [32..33] 'C','L'  [34..75] 校准表(21x16bit LE)  [76] 校验和 */
-static __xdata uint8 EeBuf[176];
+static __xdata uint8 EeBuf[288];
 
 /* 参数无效(新片/擦除后)时载入的默认值: 两个波形输出都关 */
 static void Load_Defaults(void)
@@ -936,7 +962,22 @@ bit Save_Options()
         sum += EeBuf[i];
     EeBuf[158] = sum;
 
-    return EEPROM_Save(EeBuf, 159);
+    /* per-range sample intervals: 176..259 (21 x uint32), magic 'D','T', sum 262 */
+    for (i = 0; i < 21; i++)
+    {
+        EeBuf[176 + i * 4 + 0] = (uint8)(DtTbl[i] & 0xFF);
+        EeBuf[176 + i * 4 + 1] = (uint8)((DtTbl[i] >> 8) & 0xFF);
+        EeBuf[176 + i * 4 + 2] = (uint8)((DtTbl[i] >> 16) & 0xFF);
+        EeBuf[176 + i * 4 + 3] = (uint8)((DtTbl[i] >> 24) & 0xFF);
+    }
+    EeBuf[260] = 'D';
+    EeBuf[261] = 'T';
+    sum = 0;
+    for (i = 176; i < 260; i++)
+        sum += EeBuf[i];
+    EeBuf[262] = sum;
+
+    return EEPROM_Save(EeBuf, 263);
 }
 
 void Read_Options()
@@ -944,7 +985,7 @@ void Read_Options()
     uint8 *p;
     uint8 i, sum, ok;
 
-    EEPROM_Read(EeBuf, 159);
+    EEPROM_Read(EeBuf, 263);
 
     /* 参数块校验: 擦除后全 0xFF 不能当成有效参数(否则输出全被打开) */
     sum = 0;
@@ -1000,6 +1041,21 @@ void Read_Options()
         DtA2 = (uint16)EeBuf[132] | ((uint16)EeBuf[133] << 8);
         DtB2 = (uint16)EeBuf[134] | ((uint16)EeBuf[135] << 8);
         DtThr = (uint16)EeBuf[136] | ((uint16)EeBuf[137] << 8);
+    }
+
+    /* per-range sample intervals */
+    sum = 0;
+    for (i = 176; i < 260; i++)
+        sum += EeBuf[i];
+    if (EeBuf[260] == 'D' && EeBuf[261] == 'T' && EeBuf[262] == sum)
+    {
+        for (i = 0; i < 21; i++)
+            DtTbl[i] = (uint32)EeBuf[176 + i * 4] | ((uint32)EeBuf[176 + i * 4 + 1] << 8)
+                       | ((uint32)EeBuf[176 + i * 4 + 2] << 16) | ((uint32)EeBuf[176 + i * 4 + 3] << 24);
+    }
+    else
+    {
+        DtTbl_Defaults();
     }
 
     /* generator coefficients */

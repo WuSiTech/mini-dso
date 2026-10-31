@@ -377,6 +377,36 @@ static void UART_HandleFrame(void)
         UART_SendFrame(UART_T_ACK, s, 2);
         break;
 
+    case UART_T_DTT:
+    {
+        uint8 di;
+        static __xdata uint8 dbuf[84];
+        for (di = 0; di < 21; di++)
+        {
+            dbuf[di * 4 + 0] = (uint8)(DtTbl[di] & 0xFF);
+            dbuf[di * 4 + 1] = (uint8)((DtTbl[di] >> 8) & 0xFF);
+            dbuf[di * 4 + 2] = (uint8)((DtTbl[di] >> 16) & 0xFF);
+            dbuf[di * 4 + 3] = (uint8)((DtTbl[di] >> 24) & 0xFF);
+        }
+        UART_SendFrame(UART_T_DTT, dbuf, 84);
+        break;
+    }
+    case UART_T_DTTW:
+        if (FrameLen >= 84)
+        {
+            uint8 di;
+            for (di = 0; di < 21; di++)
+                DtTbl[di] = (uint32)FrameBuf[di * 4] | ((uint32)FrameBuf[di * 4 + 1] << 8)
+                            | ((uint32)FrameBuf[di * 4 + 2] << 16) | ((uint32)FrameBuf[di * 4 + 3] << 24);
+            EA = 0;
+            ok = Save_Options();
+            EA = 1;
+            s[0] = 0; s[1] = ok ? 1 : 0;
+        }
+        else { s[0] = 1; s[1] = 0; }
+        UART_SendFrame(UART_T_ACK, s, 2);
+        break;
+
     case UART_T_SCRL:   /* ¶Á¹ö¶¯Î»ÖÃ: [0]offset [1]TriPos [2]running [3]¿í¶È */
         s[0] = (uint8)TriPosOffset;
         s[1] = TriPos;

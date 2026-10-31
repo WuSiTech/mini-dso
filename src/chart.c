@@ -325,24 +325,8 @@ void getWaveFreq()
     }
     /* fixed: frequency from the calibrated sample interval (0.01us units) */
     {
-        uint32 dt100;
-        uint16 cal = CalTable[ScaleH];
+        uint32 dt100 = DtTbl[ScaleH];
 
-        switch (ScaleH)
-        {
-        case 15: dt100 = 2000UL; break;
-        case 16: dt100 = 1200UL; break;
-        case 17: dt100 = 800UL;  break;
-        case 18: dt100 = 600UL;  break;
-        case 20: dt100 = 320UL;  break;
-        case 19: dt100 = (uint32)cal * 10000UL; break;
-        default:
-            if (cal >= DtThr)
-                dt100 = ((uint32)cal * (uint32)DtA1) / 100UL + (uint32)DtB1;
-            else
-                dt100 = ((uint32)cal * (uint32)DtA2) / 100UL + (uint32)DtB2;
-            break;
-        }
         if (dt100 < 100UL)
             dt100 = 100UL;
         if (WaveLength == 0)

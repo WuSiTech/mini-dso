@@ -483,12 +483,14 @@ class App:
         self._cur_drag = None
         self.cal_busy = False
         self.stat = {}
+        self.fw_ver = ""
 
         self.zoom = tk.DoubleVar(value=1.0)
         self.autofit = tk.IntVar(value=1)
 
         root.title("Mini-DSO 上位机 (cpv)")
-        root.geometry("1180x680")
+        root.geometry("1280x760")
+        root.minsize(980, 600)
 
         self._build_ui()
         self._translate_widgets(to_en=False)   # 初始中文: Dots/Vect -> 点/线
@@ -502,11 +504,13 @@ class App:
         main = tk.Frame(self.root)
         main.pack(fill="both", expand=True)
 
+        # ================= 左侧: 波形 =================
         left = tk.Frame(main)
-        left.pack(side="left", fill="both", expand=True)
+        left.pack(side="left", fill="both", expand=True, padx=(6, 0))
 
         self.status = tk.StringVar(value="未连接")
-        tk.Label(left, textvariable=self.status, anchor="w", font=("Consolas", 10)).pack(fill="x")
+        tk.Label(left, textvariable=self.status, anchor="w",
+                 font=("Consolas", 10)).pack(fill="x")
         self.canvas = tk.Canvas(left, bg="black", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, padx=6, pady=4)
         self.canvas.bind("<Configure>", lambda e: self._redraw(force=True))
@@ -519,28 +523,78 @@ class App:
         self.hexlabel = tk.Label(left, text="", anchor="w", font=("Consolas", 9), fg="#666")
         self.hexlabel.pack(fill="x", padx=8)
 
-        right = tk.Frame(main, width=360)
+        # ================= 右侧 =================
+        right = tk.Frame(main, width=376)
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
 
+        # ---- 底部固定区(按钮 + 状态) ----
+        bot = tk.Frame(right)
+        bot.pack(side="bottom", fill="x", padx=6, pady=(2, 4))
+
+        self.save_msg = tk.StringVar(value="")
+        tk.Label(bot, textvariable=self.save_msg, fg="green", anchor="w",
+                 font=("Segoe UI", 10, "bold")).pack(fill="x")
+        self.hint = tk.Label(bot, text="", anchor="w", justify="left", wraplength=352,
+                             fg="#a04000", font=("Segoe UI", 9))
+        self.hint.pack(fill="x")
+        self.stat_lbl = tk.Label(bot, text="", anchor="w", justify="left",
+                                 font=("Consolas", 9), fg="#0a6")
+        self.stat_lbl.pack(fill="x")
+        self.info = tk.Label(bot, text="", anchor="w", justify="left", font=("Consolas", 9))
+        self.info.pack(fill="x")
+
+        # ---- 按钮网格 (3 列 x 3 行, 单独一个 Frame 用 grid) ----
+        bgrid = tk.Frame(bot)
+        bgrid.pack(fill="x", pady=(2, 0))
+        for c in range(3):
+            bgrid.columnconfigure(c, weight=1, uniform="btn")
+        self.btn_pause = tk.Button(bgrid, text="暂停", command=self._toggle_pause)
+        self.btn_pause.grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+        tk.Button(bgrid, text="读取", command=self._read_all).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        tk.Button(bgrid, text="保存设置", command=self._save).grid(row=0, column=2, padx=2, pady=2, sticky="ew")
+        tk.Button(bgrid, text="保存波形 (CSV)", command=self._save_wave).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
+        tk.Button(bgrid, text="保存截图 (PNG)", command=self._save_shot).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
+        self.btn_view = tk.Button(bgrid, text="频谱", command=self._toggle_view)
+        self.btn_view.grid(row=1, column=2, padx=2, pady=2, sticky="ew")
+        self.btn_lang = tk.Button(bgrid, text="English", command=self._toggle_lang)
+        self.btn_lang.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
+        self.btn_cal = tk.Button(bgrid, text="一键校准", command=self._calibrate)
+        self.btn_cal.grid(row=2, column=1, columnspan=2, padx=2, pady=2, sticky="ew")
+
+        # ---- 上部参数区(可滚动) ----
+        wrap = tk.Frame(right)
+        wrap.pack(side="top", fill="both", expand=True)
+        scr = tk.Scrollbar(wrap, orient="vertical")
+        scr.pack(side="right", fill="y")
+        scrv = tk.Canvas(wrap, highlightthickness=0, width=352)
+        scrv.pack(side="left", fill="both", expand=True)
+        scrv.configure(yscrollcommand=scr.set)
+        scr.config(command=scrv.yview)
+        panel = tk.Frame(scrv)
+        scrv.create_window((0, 0), window=panel, anchor="nw", width=352)
+        panel.bind("<Configure>", lambda e: scrv.configure(scrollregion=scrv.bbox("all")))
+        scrv.bind("<MouseWheel>", lambda e: scrv.yview_scroll(-1 if getattr(e, "delta", 0) > 0 else 1, "units"))
+        panel.bind("<MouseWheel>", lambda e: scrv.yview_scroll(-1 if getattr(e, "delta", 0) > 0 else 1, "units"))
+
         # --- 连接 ---
-        box = tk.LabelFrame(right, text="连接")
-        box.pack(fill="x", padx=6, pady=4)
+        box = tk.LabelFrame(panel, text="连接")
+        box.pack(fill="x", padx=2, pady=3)
         self.port_var = tk.StringVar(value="")
         self.ports = [p.device for p in list_ports.comports()] if (HAVE_SERIAL and list_ports) else []
-        self.port_box = ttk.Combobox(box, textvariable=self.port_var, values=self.ports, width=8)
-        self.port_box.pack(side="left", padx=3, pady=3)
+        self.port_box = ttk.Combobox(box, textvariable=self.port_var, values=self.ports, width=7)
+        self.port_box.pack(side="left", padx=2, pady=2)
         self.baud_var = tk.StringVar(value=str(BAUD))
         ttk.Combobox(box, textvariable=self.baud_var, values=[str(b) for b in BAUD_CANDIDATES],
-                     width=7).pack(side="left", padx=2)
-        self.btn_connect = tk.Button(box, text="连接", width=6, command=self._toggle_connect)
-        self.btn_connect.pack(side="left", padx=2)
+                     width=6).pack(side="left", padx=1)
+        self.btn_connect = tk.Button(box, text="连接", width=5, command=self._toggle_connect)
+        self.btn_connect.pack(side="left", padx=1)
         tk.Button(box, text="刷新", width=4, command=self._refresh_ports).pack(side="left", padx=1)
-        tk.Button(right, text="扫描波特率", command=self._scan_bauds).pack(fill="x", padx=8, pady=2)
+        tk.Button(panel, text="扫描波特率", command=self._scan_bauds).pack(fill="x", padx=3, pady=(0, 3))
 
-        # --- 参数 ---
-        p = tk.LabelFrame(right, text="示波器参数（改完即时生效）")
-        p.pack(fill="x", padx=6, pady=4)
+        # --- 示波器参数 ---
+        p = tk.LabelFrame(panel, text="示波器参数（旋转即刻生效）")
+        p.pack(fill="x", padx=2, pady=3)
         p.columnconfigure(1, weight=1)
         row = 0
 
@@ -554,6 +608,7 @@ class App:
         self.v_tri = tk.IntVar(value=1600)
         self.v_slope = tk.IntVar(value=1)
         self.v_trmode = tk.StringVar(value="Auto")
+        self.v_wscroll = tk.IntVar(value=0)
         self.v_outpwm = tk.IntVar(value=1)
         self.v_outsin = tk.IntVar(value=1)
         self.v_outuart = tk.IntVar(value=1)
@@ -561,30 +616,36 @@ class App:
         self.v_genduty = tk.IntVar(value=50)
         self.v_wavetype = tk.IntVar(value=0)
         self.v_lang = tk.IntVar(value=0)
+        self.v_genfreq_txt = tk.StringVar(value=GEN_FREQ_TXT[0])
+        self.v_wavetype_txt = tk.StringVar(value=WAVE_TYPE_TXT[0])
+        self.v_lang_txt = tk.StringVar(value=LANG_TXT[0])
 
         def lab(text):
             nonlocal row
-            tk.Label(p, text=text, anchor="w").grid(row=row, column=0, sticky="w", padx=3, pady=1)
+            tk.Label(p, text=text, anchor="w").grid(row=row, column=0, sticky="w", padx=3, pady=0)
 
+        # 绘图模式
         lab("绘图模式")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="w")
-        tk.Radiobutton(f, text="Dots", variable=self.v_pmode, value=0,
+        tk.Radiobutton(f, text="点", variable=self.v_pmode, value=0,
                        command=self._schedule_apply).pack(side="left")
-        tk.Radiobutton(f, text="Vect", variable=self.v_pmode, value=1,
+        tk.Radiobutton(f, text="线", variable=self.v_pmode, value=1,
                        command=self._schedule_apply).pack(side="left")
         row += 1
 
-        lab("LSB")
-        tk.Spinbox(p, from_=50, to=750, textvariable=self.v_lsb, width=8,
+        # LSB / 亮度
+        lab("分压系数 LSB")
+        tk.Spinbox(p, from_=50, to=750, textvariable=self.v_lsb, width=7,
                    command=self._schedule_apply).grid(row=row, column=1, sticky="w")
         row += 1
 
-        lab("亮度 / BRT")
-        tk.Spinbox(p, from_=1, to=25, textvariable=self.v_brt, width=8,
+        lab("亮度 BRT")
+        tk.Spinbox(p, from_=1, to=25, textvariable=self.v_brt, width=7,
                    command=self._schedule_apply).grid(row=row, column=1, sticky="w")
         row += 1
 
+        # 时基
         lab("时基")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="ew")
@@ -595,27 +656,30 @@ class App:
         tk.Label(f, textvariable=self.scaleh_lbl, width=6, anchor="e").pack(side="left")
         row += 1
 
-        lab("纵轴量程")
+        # 量程
+        lab("电压量程")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="w")
         tk.Checkbutton(f, text="AUTO", variable=self.v_auto,
                        command=self._schedule_apply).pack(side="left")
         tk.Label(f, text="max").pack(side="left")
-        tk.Spinbox(f, from_=0, to=30000, increment=100, textvariable=self.v_vmax, width=6,
+        tk.Spinbox(f, from_=0, to=30000, increment=100, textvariable=self.v_vmax, width=5,
                    command=self._schedule_apply).pack(side="left")
         tk.Label(f, text="min").pack(side="left")
-        tk.Spinbox(f, from_=0, to=30000, increment=100, textvariable=self.v_vmin, width=6,
+        tk.Spinbox(f, from_=0, to=30000, increment=100, textvariable=self.v_vmin, width=5,
                    command=self._schedule_apply).pack(side="left")
         row += 1
 
+        # 触发电平
         lab("触发电平")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="w")
-        tk.Spinbox(f, from_=0, to=30000, increment=100, textvariable=self.v_tri, width=7,
+        tk.Spinbox(f, from_=0, to=30000, increment=100, textvariable=self.v_tri, width=6,
                    command=self._schedule_apply).pack(side="left")
         tk.Label(f, text="mV").pack(side="left")
         row += 1
 
+        # 触发沿
         lab("触发沿")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="w")
@@ -625,13 +689,21 @@ class App:
                        command=self._schedule_apply).pack(side="left")
         row += 1
 
+        # 触发方式
         lab("触发方式")
-        ttk.Combobox(p, textvariable=self.v_trmode, values=TRI_MODE_TXT, width=8,
+        ttk.Combobox(p, textvariable=self.v_trmode, values=TRI_MODE_TXT, width=7,
                      state="readonly").grid(row=row, column=1, sticky="w")
         self.v_trmode.trace_add("write", lambda *a: self._schedule_apply())
         row += 1
 
-        lab("输出 / Out")
+        # 滚动模式
+        lab("滚动模式")
+        tk.Checkbutton(p, text="WaveScroll", variable=self.v_wscroll,
+                       command=self._schedule_apply).grid(row=row, column=1, sticky="w")
+        row += 1
+
+        # 输出开关
+        lab("输出开关")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="w")
         tk.Checkbutton(f, text="PWM", variable=self.v_outpwm,
@@ -642,44 +714,40 @@ class App:
                        command=self._schedule_apply).pack(side="left")
         row += 1
 
-        # --- v1.2: 方波频率 / 占空比 / 波形类型 / 设备语言 ---
-        self.v_genfreq_txt = tk.StringVar(value=GEN_FREQ_TXT[0])
-        self.v_wavetype_txt = tk.StringVar(value=WAVE_TYPE_TXT[0])
-        self.v_lang_txt = tk.StringVar(value=LANG_TXT[0])
-
-        lab("方波频率 / Freq")
+        # 信号源
+        lab("方波频率")
         cb = ttk.Combobox(p, textvariable=self.v_genfreq_txt, values=GEN_FREQ_TXT,
-                          width=8, state="readonly")
+                          width=7, state="readonly")
         cb.grid(row=row, column=1, sticky="w")
         cb.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
         row += 1
 
-        lab("占空比 / Duty")
-        sp = tk.Spinbox(p, from_=1, to=99, textvariable=self.v_genduty, width=8,
+        lab("占空比")
+        sp = tk.Spinbox(p, from_=1, to=99, textvariable=self.v_genduty, width=7,
                         command=self._schedule_apply)
         sp.grid(row=row, column=1, sticky="w")
         sp.bind("<KeyRelease>", lambda e: self._schedule_apply())
         row += 1
 
-        lab("波形类型 / Wave")
+        lab("波形类型")
         cbw = ttk.Combobox(p, textvariable=self.v_wavetype_txt, values=WAVE_TYPE_TXT,
-                           width=10, state="readonly")
+                           width=9, state="readonly")
         cbw.grid(row=row, column=1, sticky="w")
         cbw.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
         row += 1
 
-        lab("设备语言 / DSO Lang")
+        lab("设备语言")
         cbl = ttk.Combobox(p, textvariable=self.v_lang_txt, values=LANG_TXT,
-                           width=8, state="readonly")
+                           width=7, state="readonly")
         cbl.grid(row=row, column=1, sticky="w")
         cbl.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
         row += 1
 
         # --- 显示 ---
-        d = tk.LabelFrame(right, text="显示")
-        d.pack(fill="x", padx=6, pady=4)
+        d = tk.LabelFrame(panel, text="显示")
+        d.pack(fill="x", padx=2, pady=3)
         d.columnconfigure(1, weight=1)
-        tk.Label(d, text="纵向缩放").grid(row=0, column=0, sticky="w", padx=3, pady=1)
+        tk.Label(d, text="纵向缩放").grid(row=0, column=0, sticky="w", padx=3)
         f = tk.Frame(d)
         f.grid(row=0, column=1, sticky="ew")
         ttk.Scale(f, from_=0.5, to=10.0, orient="horizontal", variable=self.zoom,
@@ -688,41 +756,10 @@ class App:
                        command=lambda: self._redraw(force=True)).pack(side="left")
         self.zoom_lbl = tk.Label(d, text="", anchor="w", font=("Consolas", 9))
         self.zoom_lbl.grid(row=1, column=0, columnspan=2, sticky="w", padx=3)
+        tk.Frame(panel, height=6).pack()
 
-        # --- 按钮 ---
-        b = tk.Frame(right)
-        b.pack(fill="x", padx=6, pady=6)
-        self.btn_pause = tk.Button(b, text="暂停", width=7, command=self._toggle_pause)
-        self.btn_pause.pack(side="left", padx=2)
-        tk.Button(b, text="读取", width=6, command=self._read_all).pack(side="left", padx=2)
-        tk.Button(b, text="保存设置", command=self._save).pack(side="left", padx=2)
-
-        b2 = tk.Frame(right)
-        b2.pack(fill="x", padx=6)
-        tk.Button(b2, text="保存波形 (CSV)", command=self._save_wave).pack(side="left", padx=2)
-        tk.Button(b2, text="保存截图 (PNG)", command=self._save_shot).pack(side="left", padx=2)
-
-        b3 = tk.Frame(right)
-        b3.pack(fill="x", padx=6, pady=2)
-        self.btn_view = tk.Button(b3, text="频谱", width=6, command=self._toggle_view)
-        self.btn_view.pack(side="left", padx=2)
-        self.btn_lang = tk.Button(b3, text="English", width=7, command=self._toggle_lang)
-        self.btn_lang.pack(side="left", padx=2)
-        self.btn_cal = tk.Button(b3, text="一键校准", width=8, command=self._calibrate)
-        self.btn_cal.pack(side="left", padx=2)
-
-        self.info = tk.Label(right, text="", anchor="w", justify="left", font=("Consolas", 9))
-        self.info.pack(fill="x", padx=8)
-        self.stat_lbl = tk.Label(right, text="", anchor="w", justify="left", font=("Consolas", 9), fg="#0a6")
-        self.stat_lbl.pack(fill="x", padx=8)
-        self.save_msg = tk.StringVar(value="")
-        tk.Label(right, textvariable=self.save_msg, fg="green", anchor="w",
-                 font=("Segoe UI", 11, "bold")).pack(fill="x", padx=8, pady=2)
-        self.hint = tk.Label(right, text="", anchor="w", justify="left", wraplength=340,
-                             fg="#a04000", font=("Segoe UI", 9))
-        self.hint.pack(fill="x", padx=8)
         if not HAVE_SERIAL:
-            self._hint("pyserial 未安装：pip install pyserial（或 --demo）")
+            self._hint("pyserial 未安装（pip install pyserial），可用 --demo 演示")
 
     # ---------------- 中英切换 ----------------
     def _tr(self, text):
@@ -910,7 +947,7 @@ class App:
             scaleh=int(self.v_scaleh.get()), scalev_auto=int(self.v_auto.get()),
             rulervmax=int(self.v_vmax.get()), rulervmin=int(self.v_vmin.get()),
             trilevel=int(self.v_tri.get()), trimode=TRI_MODE_TXT.index(self.v_trmode.get()),
-            trislope=int(self.v_slope.get()), wavescroll=0,
+            trislope=int(self.v_slope.get()), wavescroll=int(self.v_wscroll.get()),
             brightness=int(self.v_brt.get()),
             outpwm=int(self.v_outpwm.get()), outsin=int(self.v_outsin.get()),
             outuart=int(self.v_outuart.get()),
@@ -962,6 +999,7 @@ class App:
     def _read_all(self):
         self.pending_get = time.time()
         self._send(build_frame(T_GET))
+        self._send(build_frame(T_INFO))
 
     def _save(self):
         self._msg("保存中...")
@@ -982,6 +1020,7 @@ class App:
             self.v_tri.set(s["trilevel"])
             self.v_slope.set(1 if s["trislope"] else 0)
             self.v_trmode.set(TRI_MODE_TXT[s["trimode"]] if 0 <= s["trimode"] < 3 else "Auto")
+            self.v_wscroll.set(1 if s.get("wavescroll") else 0)
             self.v_brt.set(s["brightness"])
             self.v_outpwm.set(1 if s["outpwm"] else 0)
             self.v_outsin.set(1 if s["outsin"] else 0)
@@ -1244,7 +1283,7 @@ class App:
         threading.Thread(target=self._cal_worker, args=(port, baud), daemon=True).start()
 
     def _cal_worker(self, port, baud):
-        import json
+        """一键校准: 逐档输出测试方波 -> 测实际采样间隔 -> 回写校准表(21 档全覆盖)"""
         T_CAL_W, T_CAL_R, T_TEST = 0x16, 0x17, 0x15
         tbl = None
         try:
@@ -1269,7 +1308,7 @@ class App:
                 return read_frames(sec)
 
             # 读当前校准表
-            for t, pl in req(T_CAL_R, sec=1.0):
+            for t, pl in req(T_CAL_R, sec=1.2):
                 if t == T_CAL_R and len(pl) == 42:
                     tbl = [pl[i * 2] | (pl[i * 2 + 1] << 8) for i in range(21)]
             if tbl is None:
@@ -1279,37 +1318,32 @@ class App:
                 if t == 0x03 and len(pl) >= SETTINGS_LEN:
                     cur = settings_from_bytes(pl)
             if cur is None:
-                raise RuntimeError("读设置失败")
-            cur["trimode"] = 0
+                raise RuntimeError("读取参数失败")
+            cur["trimode"] = 0          # 自动触发, 波形稳定
             cur["scalev_auto"] = 1
+            cur["wavescroll"] = 0
 
-            def testdiv_for(i):
-                if i <= 1:
-                    return 18029
-                if i <= 5:
-                    return 3606
-                if i <= 10:
-                    return 361
-                if i <= 14:
-                    return 36
-                return 0
-
-            tick = 72115.0 / 2.0
             new = list(tbl)
-            for idx in range(15):   # 快档(15~19)靠精细延时, 自动拟合不稳, 保留编译值
-                div = testdiv_for(idx)
-                f_ref = (tick / div) if div else 9014.0
+            N = len(SCALE_H_TXT)        # 21
+            for idx in range(N):
+                dt_us = SCALE_H_SEC[idx] / 25.0 * 1e6      # 每采样点目标间隔(us)
+                # 参考信号周期取 40 个采样点, 换算成测试方波分频
+                target_period_us = 40.0 * dt_us
+                f_want = 1e6 / target_period_us
+                div = int(round(72115.0 / (2.0 * f_want)))
+                div = max(1, min(30000, div))
+                f_ref = 72115.0 / (2.0 * div)
+
                 req(T_TEST, bytes([div & 0xFF, (div >> 8) & 0xFF]))
-                time.sleep(0.1)
                 cur["scaleh"] = idx
                 ser.write(build_frame(T_SET, settings_to_bytes(cur)))
-                time.sleep(0.1)
-                target = SCALE_H_SEC[idx] / 25.0 * 1e6
-                settle = min(30.0, target * 1e-6 * 220 * 2.2 + 0.4 + 2.0 / f_ref)
-                read_frames(settle)
+                # 等这档扫描 + 2 个参考周期
+                settle = 220.0 * dt_us * 1e-6 * 1.4 + 0.5 + 2.0 / f_ref
+                read_frames(min(40.0, settle))
+
                 per = []
                 t0 = time.time()
-                while time.time() - t0 < 8.0 and len(per) < 5:
+                while time.time() - t0 < 6.0 and len(per) < 5:
                     for tt, pp in read_frames(0.3):
                         if tt == T_SAMPLE:
                             sp = parse_sample(pp)
@@ -1318,15 +1352,23 @@ class App:
                                 if x:
                                     per.append(x)
                 if not per:
-                    self.rx_queue.put(("cal_progress", "第 %d 档测不到波形, 跳过" % idx))
+                    self.rx_queue.put(("cal_progress",
+                                       "第 %d 档未测到周期，跳过" % (idx + 1)))
                     continue
+
                 per = sorted(per)[len(per) // 2]
-                meas = (1.0 / f_ref) / per * 1e6
-                slope = 1.0 if idx <= 14 else 0.25
-                delta = int(round((target - meas) / slope))
+                meas = (1.0 / f_ref) / per * 1e6            # 实测每点间隔(us)
+                # 增量换算: DelayUs(1us/单位) / DelayFine(约0.4us/单位)
+                if idx >= 15 and idx != 19:
+                    step_us = 0.4
+                else:
+                    step_us = 1.0
+                delta = int(round((dt_us - meas) / step_us))
                 new[idx] = max(0, min(65535, tbl[idx] + delta))
-                self.rx_queue.put(("cal_progress", "校准 %d/21: %s  实测 %.1fus 目标 %.1fus"
-                                   % (idx + 1, SCALE_H_TXT[idx], meas, target)))
+                self.rx_queue.put(("cal_progress",
+                                   "校准 %d/%d: %s  实测 %.2fus 目标 %.2fus"
+                                   % (idx + 1, N, SCALE_H_TXT[idx], meas, dt_us)))
+
             pl = b"".join(bytes([v & 0xFF, (v >> 8) & 0xFF]) for v in new)
             ack = req(T_CAL_W, pl, 2.0)
             ok = bool([1 for t, a in ack if t == T_ACK and len(a) >= 2 and a[1]])
@@ -1445,6 +1487,8 @@ class App:
         rx = self.link.rx_bytes
         nf = self.link.rx_frames
         txt = "已连接 %s @%s   RX=%d B  帧=%d" % (self.link.port, self.baud_var.get(), rx, nf)
+        if getattr(self, "fw_ver", ""):
+            txt += "   固件 " + self.fw_ver
         if self.paused:
             txt += "   [已暂停]"
         self._status(txt)
@@ -1460,6 +1504,9 @@ class App:
                 self.pending_save = 0.0
                 self._msg("Save succeed" if payload[1] else "Save failed!")
                 self._hint("")
+        elif type_ == T_INFO:
+            if len(payload) >= 3:
+                self.fw_ver = "v%d.%d.%d" % (payload[0], payload[1], payload[2])
         elif type_ == T_SETTINGS:
             if len(payload) >= SETTINGS_LEN:
                 self._apply_settings_to_ui(settings_from_bytes(payload))

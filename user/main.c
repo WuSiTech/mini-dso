@@ -799,11 +799,10 @@ void UART_Isr(void) __interrupt (4)
 }
 /* cpv - 正弦波查表: 8 点/周期, 8 位 PWM 占空比, 中心 128, 幅度 96
    Sine table: 8 entries, 8-bit PWM duty, centre 128, amplitude 96 */
-uint8 code SineTab[8] = {128, 196, 224, 196, 128, 60, 32, 60};
-/* cpv - 三角 / 锯齿波形表(8 步, 8 位 PWM 占空比) */
-uint8 code TriTab[8] = {16, 80, 144, 208, 208, 144, 80, 16};
-uint8 code SawTab[8] = {8, 40, 72, 104, 136, 168, 200, 232};
-
+/* 64 entries per cycle, 8-bit PWM duty (centre 128, amplitude 96) */
+uint8 code SineTab[64] = {128, 137, 147, 156, 165, 173, 181, 189, 196, 202, 208, 213, 217, 220, 222, 224, 224, 224, 222, 220, 217, 213, 208, 202, 196, 189, 181, 173, 165, 156, 147, 137, 128, 119, 109, 100, 91, 83, 75, 67, 60, 54, 48, 43, 39, 36, 34, 32, 32, 32, 34, 36, 39, 43, 48, 54, 60, 67, 75, 83, 91, 100, 109, 119};
+uint8 code TriTab[64] = {128, 131, 134, 137, 140, 143, 147, 150, 153, 156, 159, 162, 165, 168, 171, 174, 178, 181, 184, 187, 190, 193, 196, 199, 202, 205, 209, 212, 215, 218, 221, 224, 224, 221, 218, 215, 212, 209, 205, 202, 199, 196, 193, 190, 187, 184, 181, 178, 174, 171, 168, 165, 162, 159, 156, 153, 150, 147, 143, 140, 137, 134, 131, 128};
+uint8 code SawTab[64] = {32, 35, 38, 41, 44, 47, 50, 53, 56, 59, 62, 66, 69, 72, 75, 78, 81, 84, 87, 90, 93, 96, 99, 102, 105, 108, 111, 114, 117, 120, 123, 126, 130, 133, 136, 139, 142, 145, 148, 151, 154, 157, 160, 163, 166, 169, 172, 175, 178, 181, 184, 187, 190, 194, 197, 200, 203, 206, 209, 212, 215, 218, 221, 224};
 /* cpv - P1.0 正弦 + P1.1 方波
    P1.0 (PCA CCP0): 175.8kHz 8-bit PWM, 占空比按 8 点正弦表变化, 经板上 RC 滤波后为 9kHz 正弦
    P1.1: 9kHz 方波
@@ -811,9 +810,9 @@ uint8 code SawTab[8] = {8, 40, 72, 104, 136, 168, 200, 232};
 void PWM_Isr(void) __interrupt (TIMER_1)
 {
   static __data uint8 SineIdx = 0;
-  static __data uint8 SineDiv = 0;   /* sine step divider: 72.1kHz/256 -> ~35Hz */
   static __data uint8 PwmCnt = 0;    /* software PWM counter (0..31) */
-  static __data uint8 PwmDuty = 16;   /* software PWM duty (0..31) */
+  static __data uint8 PwmVal = 128;   /* 8-bit waveform value */
+  static __data uint8 Dither = 0;     /* 0..15 dither for 8-bit duty */
   static uint16 TestCnt = 0;
   static uint8 GenPreCnt = 0;
   static uint16 GenCnt = 0;
@@ -829,25 +828,25 @@ void PWM_Isr(void) __interrupt (TIMER_1)
     return;
   }
 
-  /* P1.0 software PWM: PCA CEX0 does not reach P1.0 on this chip, so the
-     sine / triangle / sawtooth is generated here: 16-level PWM at
-     72.1kHz/16 = 4.5kHz carrier, table step every 256 interrupts
-     -> about 35Hz, smoothed by the on-board RP1 + C3 network */
+  /* P1.0 software PWM: 16-tick carrier (72.1kHz/16 = 4.5kHz), one table
+     entry per carrier period (64 entries -> about 70Hz), and the +Dither
+     trick dithers the 4-bit duty over 16 periods so the filtered output is
+     an 8-bit-resolution wave instead of a staircase */
   if (++PwmCnt >= 16)
-    PwmCnt = 0;
-  P10 = (OutSIN && (PwmCnt < PwmDuty)) ? 1 : 0;
-
-  if (++SineDiv == 0)          /* 256 interrupts per table step */
   {
+    PwmCnt = 0;
     if (WaveType == 1)
-      PwmDuty = (uint8)(TriTab[SineIdx] >> 4);
+      PwmVal = TriTab[SineIdx];
     else if (WaveType == 2)
-      PwmDuty = (uint8)(SawTab[SineIdx] >> 4);
+      PwmVal = SawTab[SineIdx];
     else
-      PwmDuty = (uint8)(SineTab[SineIdx] >> 4);
-    if (++SineIdx >= 8)
+      PwmVal = SineTab[SineIdx];
+    if (++SineIdx >= 64)
       SineIdx = 0;
+    if (++Dither >= 16)
+      Dither = 0;
   }
+  P10 = (OutSIN && (PwmCnt < (uint8)((PwmVal + Dither) >> 4))) ? 1 : 0;
 
   if (OutPWM)
   {

@@ -811,6 +811,9 @@ uint8 code SawTab[8] = {8, 40, 72, 104, 136, 168, 200, 232};
 void PWM_Isr(void) __interrupt (TIMER_1)
 {
   static __data uint8 SineIdx = 0;
+  static __data uint8 SineDiv = 0;   /* sine step divider: 72.1kHz/256 -> ~35Hz */
+  static __data uint8 PwmCnt = 0;    /* software PWM counter (0..31) */
+  static __data uint8 PwmDuty = 16;   /* software PWM duty (0..31) */
   static uint16 TestCnt = 0;
   static uint8 GenPreCnt = 0;
   static uint16 GenCnt = 0;
@@ -826,22 +829,26 @@ void PWM_Isr(void) __interrupt (TIMER_1)
     return;
   }
 
-  if (OutSIN)                   // 波形输出开关
+  /* P1.0 software PWM: PCA CEX0 does not reach P1.0 on this chip, so the
+     sine / triangle / sawtooth is generated here: 16-level PWM at
+     72.1kHz/16 = 4.5kHz carrier, table step every 256 interrupts
+     -> about 35Hz, smoothed by the on-board RP1 + C3 network */
+  if (++PwmCnt >= 16)
+    PwmCnt = 0;
+  P10 = (OutSIN && (PwmCnt < PwmDuty)) ? 1 : 0;
+
+  if (++SineDiv == 0)          /* 256 interrupts per table step */
   {
     if (WaveType == 1)
-      CCAP0H = TriTab[SineIdx];
+      PwmDuty = (uint8)(TriTab[SineIdx] >> 4);
     else if (WaveType == 2)
-      CCAP0H = SawTab[SineIdx];
+      PwmDuty = (uint8)(SawTab[SineIdx] >> 4);
     else
-      CCAP0H = SineTab[SineIdx];
+      PwmDuty = (uint8)(SineTab[SineIdx] >> 4);
+    if (++SineIdx >= 8)
+      SineIdx = 0;
   }
-  else
-    CCAP0H = 0;                 // 关闭时输出常低
 
-  if (++SineIdx >= 8)           // 8 步 = 一个周期
-    SineIdx = 0;
-
-  /* P1.1 方波发生器: 频率/占空比可调 */
   if (OutPWM)
   {
     if (++GenPreCnt >= GenPre)
@@ -859,13 +866,13 @@ void PWM_Isr(void) __interrupt (TIMER_1)
 // 45.000MHz: PCA 8-bit PWM 载波 175.8kHz, Timer1 中断 72.1kHz -> 正弦/方波 9.01kHz
 void PWM_Init(void)
 {
-  /* P1.0: PCA 8 位 PWM, 时钟 = 系统时钟/1, CCP0 -> P1.0 */
+  /* PCA: P1.0 不受 CEX0 驱动(实测), 波形输出改用 Timer1 中断里的软 PWM */
   CMOD = 0x04;     // PCA 时钟 = SYSclk/1
   CL = 0;
   CH = 0;
   PCA_PWM0 = 0x00; // 8 位 PWM
   CCAP0H = 128;    // 初始 50% 占空比
-  CCAPM0 = 0x42;   // ECOM0=1, PWM0=1
+  CCAPM0 = 0x00;   /* PCA not used for wave out (CEX0 not on P1.0) */   // ECOM0=1, PWM0=1
   CR = 1;          // 启动 PCA
 
   /* P1.1: Timer1 中断, 12T 模式, 72.1kHz */

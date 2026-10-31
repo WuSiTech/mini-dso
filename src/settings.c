@@ -56,7 +56,7 @@ void Output_Update(void)
     /* P1.0 正弦 */
     if (OutSIN)
     {
-        CCAPM0 = 0x42; /* PCA 8 位 PWM 模式, CEX0 由 PCA 驱动 */
+        CCAPM0 = 0x00;   /* wave out is software PWM on P1.0 */ /* PCA 8 位 PWM 模式, CEX0 由 PCA 驱动 */
     }
     else
     {

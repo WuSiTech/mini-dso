@@ -220,29 +220,7 @@ void getWaveFreq()
             n_num = 3;
             break;
         }
-    /* fixed: frequency from the calibrated sample interval (CalTable), 0.01us units */
-    {
-        uint32 dt100;
-        uint16 cal = CalTable[ScaleH];
-
-        switch (ScaleH)
-        {
-        case 15: dt100 = 2000UL; break;
-        case 16: dt100 = 1200UL; break;
-        case 17: dt100 = 800UL;  break;
-        case 18: dt100 = 600UL;  break;
-        case 20: dt100 = 320UL;  break;
-        case 19: dt100 = (uint32)cal * 10000UL; break;
-        default: dt100 = ((uint32)cal * 12300UL) / 10000UL + 2000UL; break;
-        }
-        if (dt100 < 100UL)
-            dt100 = 100UL;
-        if (WaveLength == 0)
-            WaveFreq = 0;
-        else
-            WaveFreq = (float)(100000000UL / ((uint32)WaveLength * dt100));
-    }
-
+    
 
         WaveLengthSum += WaveLength;
 
@@ -345,6 +323,34 @@ void getWaveFreq()
         WaveFreq = 312500 / WaveLength;
         break;
     }
+    /* fixed: frequency from the calibrated sample interval (0.01us units) */
+    {
+        uint32 dt100;
+        uint16 cal = CalTable[ScaleH];
+
+        switch (ScaleH)
+        {
+        case 15: dt100 = 2000UL; break;
+        case 16: dt100 = 1200UL; break;
+        case 17: dt100 = 800UL;  break;
+        case 18: dt100 = 600UL;  break;
+        case 20: dt100 = 320UL;  break;
+        case 19: dt100 = (uint32)cal * 10000UL; break;
+        default:
+            if (cal >= DtThr)
+                dt100 = ((uint32)cal * (uint32)DtA1) / 100UL + (uint32)DtB1;
+            else
+                dt100 = ((uint32)cal * (uint32)DtA2) / 100UL + (uint32)DtB2;
+            break;
+        }
+        if (dt100 < 100UL)
+            dt100 = 100UL;
+        if (WaveLength == 0)
+            WaveFreq = 0;
+        else
+            WaveFreq = (float)(100000000UL / ((uint32)WaveLength * dt100));
+    }
+
 }
 
 /* ½«mv×ª»»ÎªADC
@@ -1246,13 +1252,13 @@ void PlotOutCalPage(void)
     OLED_Set_Pos(2, 0);
     OLED_DrawString("OUT ");
     OLED_DrawNum(OutCalSel, NumDigits(OutCalSel));
-    OLED_DrawString("/20 ");
+    OLED_DrawString("/27 ");
 
     base = (OutCalSel > 2) ? (uint8)(OutCalSel - 2) : 0;
     for (slot = 0; slot < 5; slot++)
     {
         idx = base + slot;
-        if (idx > 20)
+        if (idx > 25)
             break;
         y = (int8)(slot * 12 + 12);
         if (y > 52)
@@ -1263,15 +1269,28 @@ void PlotOutCalPage(void)
         OLED_DrawString("#");
         OLED_DrawNum(idx, NumDigits(idx));
         OLED_Set_Pos(30, (uint8)(y + 2));
-        if (OutOff[idx] < 0)
+        if (idx < 21)
         {
-            OLED_DrawString("-");
-            OLED_DrawNum((uint16)(-OutOff[idx]), 5);
+            if (OutOff[idx] < 0)
+            {
+                OLED_DrawString("-");
+                OLED_DrawNum((uint16)(-OutOff[idx]), 5);
+            }
+            else
+            {
+                OLED_DrawString("+");
+                OLED_DrawNum((uint16)OutOff[idx], 5);
+            }
+        }
+        else if (idx == 21)
+        {
+            OLED_DrawString("TK");
+            OLED_DrawNum(GenTickCal, 5);
         }
         else
         {
-            OLED_DrawString("+");
-            OLED_DrawNum((uint16)OutOff[idx], 5);
+            OLED_DrawString("WS");
+            OLED_DrawNum(WaveStepCal[idx - 22], 5);
         }
         OLED_Reverse(0);
     }
@@ -1302,7 +1321,7 @@ void PlotCalPage(void)
     for (slot = 0; slot < 5; slot++)
     {
         idx = base + slot;
-        if (idx > 20)
+        if (idx > 25)
             break;
         y = (int8)(slot * 12 + 12);
         if (y > 52)
@@ -1313,7 +1332,18 @@ void PlotCalPage(void)
         OLED_DrawString("#");
         OLED_DrawNum(idx, NumDigits(idx));
         OLED_Set_Pos(40, (uint8)(y + 2));
-        OLED_DrawNum(CalTable[idx], 5);
+        if (idx < 21)
+            OLED_DrawNum(CalTable[idx], 5);
+        else if (idx == 21)
+            OLED_DrawNum(DtA1, 5);
+        else if (idx == 22)
+            OLED_DrawNum(DtB1, 5);
+        else if (idx == 23)
+            OLED_DrawNum(DtA2, 5);
+        else if (idx == 24)
+            OLED_DrawNum(DtB2, 5);
+        else
+            OLED_DrawNum(DtThr, 5);
         OLED_Reverse(0);
     }
     OLED_Overlap(1);

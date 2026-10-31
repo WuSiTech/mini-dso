@@ -33,6 +33,14 @@ bit WaveScroll;
 __xdata uint8 WaveFreqIdx = 2;
 __xdata int16 OutOff[21];
 uint16 WaveStepQ[6];
+uint8 WaveDiv = 32;
+__xdata uint16 DtA1 = 12955;
+__xdata uint16 DtB1 = 1800;
+__xdata uint16 DtA2 = 14258;
+__xdata uint16 DtB2 = 1550;
+__xdata uint16 DtThr = 300;
+__xdata uint16 GenTickCal = 120;
+__xdata uint16 WaveStepCal[6] = {17760, 8880, 4440, 2220, 1110, 555};
 bit OutCalPage = 0;
 uint8 OutCalSel = 0;                                            //波形滚动标志位
 bit WaveUpdate;                                            //更新波形标志位

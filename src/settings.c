@@ -40,12 +40,13 @@ void WaveFreq_Update(void)
 
     if (WaveFreqIdx > 5)
         WaveFreqIdx = 2;
+    DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
     WaveDiv = WaveDivTab[WaveFreqIdx];
 
     /* per-step period (0.1us) plus calibration offset -> Q8 ticks */
     for (i = 0; i < 6; i++)
     {
-        uint16 nom = WaveStepNom[i];
+        uint16 nom = WaveStepCal[i];
         int16 off = OutOff[15 + i];
         int16 tot;
 
@@ -56,7 +57,7 @@ void WaveFreq_Update(void)
         tot = (int16)nom + off;
         if (tot < 100)
             tot = 100;
-        q = ((uint32)tot * 256UL) / GEN_TICK_US10;
+        q = ((uint32)tot * 256UL) / (GenTickCal ? GenTickCal : 120);
         WaveStepQ[i] = (uint16)q;
     }
 }
@@ -325,13 +326,13 @@ void Change_Val(bit i)
         {
             if (i)
             {
-                if (++OutCalSel > 20)
+                if (++OutCalSel > 27)
                     OutCalSel = 0;
             }
             else
             {
                 if (OutCalSel == 0)
-                    OutCalSel = 20;
+                    OutCalSel = 27;
                 else
                     OutCalSel--;
             }
@@ -342,15 +343,42 @@ void Change_Val(bit i)
             if ((uint16)(AppMs - CalLastMs) <= 60)
                 step = 8;
             CalLastMs = AppMs;
-            if (i)
+            if (OutCalSel < 21)
             {
-                if (OutOff[OutCalSel] < 30000)
-                    OutOff[OutCalSel] += step;
+                if (i)
+                {
+                    if (OutOff[OutCalSel] < 30000)
+                        OutOff[OutCalSel] += step;
+                }
+                else
+                {
+                    if (OutOff[OutCalSel] > -30000)
+                        OutOff[OutCalSel] -= step;
+                }
+            }
+            else if (OutCalSel == 21)
+            {
+                if (i)
+                {
+                    if (GenTickCal < 65000)
+                        GenTickCal += 1;
+                }
+                else if (GenTickCal > 1)
+                    GenTickCal -= 1;
+                SetGenParams();
+                WaveFreq_Update();
             }
             else
             {
-                if (OutOff[OutCalSel] > -30000)
-                    OutOff[OutCalSel] -= step;
+                uint8 wi = (uint8)(OutCalSel - 22);
+                if (i)
+                {
+                    if (WaveStepCal[wi] < 65000)
+                        WaveStepCal[wi] += step;
+                }
+                else if (WaveStepCal[wi] > step)
+                    WaveStepCal[wi] -= step;
+                WaveFreq_Update();
             }
             OptionChanged = 1;
             WaveFreq_Update();
@@ -368,13 +396,13 @@ void Change_Val(bit i)
         {
             if (i)
             {
-                if (++CalSel > 20)
+                if (++CalSel > 25)
                     CalSel = 0;
             }
             else
             {
                 if (CalSel == 0)
-                    CalSel = 20;
+                    CalSel = 25;
                 else
                     CalSel--;
             }
@@ -385,17 +413,34 @@ void Change_Val(bit i)
             if ((uint16)(AppMs - CalLastMs) <= 60)
                 step = 8;
             CalLastMs = AppMs;
-            if (i)
             {
-                if (CalTable[CalSel] < 65000)
-                    CalTable[CalSel] += step;
-            }
-            else
-            {
-                if (CalTable[CalSel] >= step)
-                    CalTable[CalSel] -= step;
+                uint16 *pv;
+
+                if (CalSel < 21)
+                    pv = &CalTable[CalSel];
+                else if (CalSel == 21)
+                    pv = &DtA1;
+                else if (CalSel == 22)
+                    pv = &DtB1;
+                else if (CalSel == 23)
+                    pv = &DtA2;
+                else if (CalSel == 24)
+                    pv = &DtB2;
                 else
-                    CalTable[CalSel] = 0;
+                    pv = &DtThr;
+
+                if (i)
+                {
+                    if (*pv < 65000)
+                        *pv += step;
+                }
+                else
+                {
+                    if (*pv >= step)
+                        *pv -= step;
+                    else
+                        *pv = 0;
+                }
             }
             OptionChanged = 1;
         }
@@ -772,7 +817,7 @@ void check_Options()
 
 /* EEPROM 一个扇区 512 字节, 擦除是整扇区, 所以设置和校准表必须一起写
    布局: [0..17] 设置  [18..31] 0xFF  [32..33] 'C','L'  [34..75] 校准表(21x16bit LE)  [76] 校验和 */
-static __xdata uint8 EeBuf[128];
+static __xdata uint8 EeBuf[176];
 
 /* 参数无效(新片/擦除后)时载入的默认值: 两个波形输出都关 */
 static void Load_Defaults(void)
@@ -795,6 +840,7 @@ static void Load_Defaults(void)
     GenDuty = 50;
     WaveType = 0;
     WaveFreqIdx = 2;
+    DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
     Lang = 1;
 }
 
@@ -863,7 +909,34 @@ bit Save_Options()
         sum += EeBuf[i];
     EeBuf[126] = sum;
 
-    return EEPROM_Save(EeBuf, 127);
+    /* delay model coefficients: 128..137, magic 'D','M', sum 140 */
+    EeBuf[128] = (uint8)(DtA1 & 0xFF); EeBuf[129] = (uint8)(DtA1 >> 8);
+    EeBuf[130] = (uint8)(DtB1 & 0xFF); EeBuf[131] = (uint8)(DtB1 >> 8);
+    EeBuf[132] = (uint8)(DtA2 & 0xFF); EeBuf[133] = (uint8)(DtA2 >> 8);
+    EeBuf[134] = (uint8)(DtB2 & 0xFF); EeBuf[135] = (uint8)(DtB2 >> 8);
+    EeBuf[136] = (uint8)(DtThr & 0xFF); EeBuf[137] = (uint8)(DtThr >> 8);
+    EeBuf[138] = 'D';
+    EeBuf[139] = 'M';
+    sum = 0;
+    for (i = 128; i < 138; i++)
+        sum += EeBuf[i];
+    EeBuf[140] = sum;
+
+    /* generator coefficients: 142..157, magic 'G','M', sum 160 */
+    EeBuf[142] = (uint8)(GenTickCal & 0xFF); EeBuf[143] = (uint8)(GenTickCal >> 8);
+    for (i = 0; i < 6; i++)
+    {
+        EeBuf[144 + i * 2] = (uint8)(WaveStepCal[i] & 0xFF);
+        EeBuf[145 + i * 2] = (uint8)(WaveStepCal[i] >> 8);
+    }
+    EeBuf[156] = 'G';
+    EeBuf[157] = 'M';
+    sum = 0;
+    for (i = 142; i < 156; i++)
+        sum += EeBuf[i];
+    EeBuf[158] = sum;
+
+    return EEPROM_Save(EeBuf, 159);
 }
 
 void Read_Options()
@@ -871,7 +944,7 @@ void Read_Options()
     uint8 *p;
     uint8 i, sum, ok;
 
-    EEPROM_Read(EeBuf, 127);
+    EEPROM_Read(EeBuf, 159);
 
     /* 参数块校验: 擦除后全 0xFF 不能当成有效参数(否则输出全被打开) */
     sum = 0;
@@ -916,6 +989,30 @@ void Read_Options()
     Lang = *p ? 1 : 0;
 
     /* 校准表: 校验通过才覆盖默认值 */
+    /* delay model coefficients */
+    sum = 0;
+    for (i = 128; i < 138; i++)
+        sum += EeBuf[i];
+    if (EeBuf[138] == 'D' && EeBuf[139] == 'M' && EeBuf[140] == sum)
+    {
+        DtA1 = (uint16)EeBuf[128] | ((uint16)EeBuf[129] << 8);
+        DtB1 = (uint16)EeBuf[130] | ((uint16)EeBuf[131] << 8);
+        DtA2 = (uint16)EeBuf[132] | ((uint16)EeBuf[133] << 8);
+        DtB2 = (uint16)EeBuf[134] | ((uint16)EeBuf[135] << 8);
+        DtThr = (uint16)EeBuf[136] | ((uint16)EeBuf[137] << 8);
+    }
+
+    /* generator coefficients */
+    sum = 0;
+    for (i = 142; i < 156; i++)
+        sum += EeBuf[i];
+    if (EeBuf[156] == 'G' && EeBuf[157] == 'M' && EeBuf[158] == sum)
+    {
+        GenTickCal = (uint16)EeBuf[142] | ((uint16)EeBuf[143] << 8);
+        for (i = 0; i < 6; i++)
+            WaveStepCal[i] = (uint16)EeBuf[144 + i * 2] | ((uint16)EeBuf[145 + i * 2] << 8);
+    }
+
     /* output offsets: valid magic+checksum, otherwise zero (nominal) */
     sum = 0;
     for (i = 82; i < 124; i++)
@@ -950,6 +1047,7 @@ void Read_Options()
     WaveScroll = 0;   /* 旧滚动模式已停用(改用暂停+光标指滚动条) */
     if (WaveFreqIdx > 5)
         WaveFreqIdx = 2;
+    DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
     WaveDiv = WaveDivTab[WaveFreqIdx];
     EepromValid = ok;   /* cpv - 供开机自检 */
 

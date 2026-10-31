@@ -350,6 +350,33 @@ static void UART_HandleFrame(void)
         UART_SendFrame(UART_T_ACK, s, 2);
         break;
 
+    case UART_T_DTM:
+    {
+        s[0] = (uint8)(DtA1 & 0xFF); s[1] = (uint8)(DtA1 >> 8);
+        s[2] = (uint8)(DtB1 & 0xFF); s[3] = (uint8)(DtB1 >> 8);
+        s[4] = (uint8)(DtA2 & 0xFF); s[5] = (uint8)(DtA2 >> 8);
+        s[6] = (uint8)(DtB2 & 0xFF); s[7] = (uint8)(DtB2 >> 8);
+        s[8] = (uint8)(DtThr & 0xFF); s[9] = (uint8)(DtThr >> 8);
+        UART_SendFrame(UART_T_DTM, s, 10);
+        break;
+    }
+    case UART_T_DTMW:
+        if (FrameLen >= 10)
+        {
+            DtA1 = (uint16)FrameBuf[0] | ((uint16)FrameBuf[1] << 8);
+            DtB1 = (uint16)FrameBuf[2] | ((uint16)FrameBuf[3] << 8);
+            DtA2 = (uint16)FrameBuf[4] | ((uint16)FrameBuf[5] << 8);
+            DtB2 = (uint16)FrameBuf[6] | ((uint16)FrameBuf[7] << 8);
+            DtThr = (uint16)FrameBuf[8] | ((uint16)FrameBuf[9] << 8);
+            EA = 0;
+            ok = Save_Options();
+            EA = 1;
+            s[0] = 0; s[1] = ok ? 1 : 0;
+        }
+        else { s[0] = 1; s[1] = 0; }
+        UART_SendFrame(UART_T_ACK, s, 2);
+        break;
+
     case UART_T_SCRL:   /* ¶Á¹ö¶¯Î»ÖÃ: [0]offset [1]TriPos [2]running [3]¿í¶È */
         s[0] = (uint8)TriPosOffset;
         s[1] = TriPos;

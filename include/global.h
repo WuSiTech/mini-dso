@@ -45,7 +45,10 @@ extern uint8 WaveDiv;
 extern __xdata int16 OutOff[21];  /* 0..14: square period offset, 15..20: wave step offset (0.1us) */
 extern bit OutCalPage;            /* output offset table page */
 extern uint8 OutCalSel;
-extern uint16 WaveStepQ[6];       /* precomputed step period in Q8 ticks */             /* ISR 分频(由 WaveFreqIdx 换算) */
+extern uint16 WaveStepQ[6];
+extern __xdata uint16 DtA1, DtB1, DtA2, DtB2, DtThr;
+extern __xdata uint16 GenTickCal;      /* 0.1us, 默认 120 */
+extern __xdata uint16 WaveStepCal[6];  /* 每步标称周期 0.1us */  /* delay model (EEPROM) */       /* precomputed step period in Q8 ticks */             /* ISR 分频(由 WaveFreqIdx 换算) */
 extern bit WaveUpdate;
 extern bit ScaleV_Auto;
 extern bit ADCComplete;
@@ -81,7 +84,7 @@ extern bit PostEepromOk, PostCalOk, PostBgvOk;   /* 开机自检结果 */
 
 #define FW_VER_MAJOR 1
 #define FW_VER_MINOR 7
-#define FW_VER_PATCH 3
+#define FW_VER_PATCH 5
 #define FW_VERSION ((FW_VER_MAJOR << 8) | (FW_VER_MINOR << 4) | FW_VER_PATCH)
 
 extern __xdata uint8 InfoSel;   /* 信息页选中项: 0作者 1开发 2返回 */   /* 1: 正在显示创作者信息页 */        // P1.0 波形类型: 0正弦 1三角 2锯齿

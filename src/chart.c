@@ -651,6 +651,18 @@ void PlotChart(void)
         /* 波形位置标尺
            Ruler for waveform position*/
         /* 选中"滚动位置"时: 整条标尺反色(白底黑线); 未选中则清黑, 不留残影 */
+
+        /* 波形电压范围
+           Voltage range of waveform*/
+        OLED_Set_Pos(26, 56);
+        s = c_mv_V(VMin);
+        OLED_DrawString(s);
+        OLED_DrawString("-");
+        s = c_mv_V(VMax);
+        OLED_DrawString(s);
+        OLED_DrawString("V");
+    }
+
         if (OptionInChart == 5)
         {
             OLED_FillRect(0, 56, 25, 63, 1);
@@ -667,17 +679,6 @@ void PlotChart(void)
         OLED_DrawVLine((TriPos + TriPosOffset - 50) * 24 / 119, 58, 4);
         if (OptionInChart == 5)
             OLED_Reverse(0);
-
-        /* 波形电压范围
-           Voltage range of waveform*/
-        OLED_Set_Pos(26, 56);
-        s = c_mv_V(VMin);
-        OLED_DrawString(s);
-        OLED_DrawString("-");
-        s = c_mv_V(VMax);
-        OLED_DrawString(s);
-        OLED_DrawString("V");
-    }
 
     OLED_Overlap(0); //设置绘图模式为覆盖
 

@@ -1152,7 +1152,6 @@ void PlotSplash(void)
     OLED_DrawString(PostCalOk ? "OK " : "ERR");
     OLED_DrawString(" ");
     OLED_DrawString(c_mv_V(GetBGV_cpv()));
-    OLED_DrawString("V");
     OLED_Overlap(1);
 }
 

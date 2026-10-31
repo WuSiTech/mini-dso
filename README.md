@@ -1,4 +1,4 @@
-# Mini-DSO v1.7 — STC8A8K64D4 @ 45 MHz
+# Mini-DSO v1.7.10 — STC8A8K64D4 @ 45 MHz
 
 **中文** | [English](#english-version)
 
@@ -228,7 +228,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 > ⚠️ **必须带 `--stack-auto`**：8051 直接寻址 RAM 只有 128 B，不加会报
 > `Could not get ... consecutive bytes in internal RAM for area DSEG`。
 
-资源占用（v1.4.1）：ROM 38,693 / 64,512 (60%)、XRAM 3,558 / 8,192、栈 217 B。
+资源占用（v1.7.10）：ROM 45,155 / 64,512 (70%)、XRAM 4,391 / 8,192、栈 217 B。
 
 中文字库改了之后重新生成：`python py\gen_cnfont.py`（不要手改 `include/cnfont.h`）。
 
@@ -241,6 +241,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
   （固件收到 `0x14` 后软复位进 ISP）
 
 > 烧录会整片擦除 EEPROM：设置和校准表回到默认值。
+> 烧完执行 `python py\restore_all.py` 一键写回实测 CalTable 与 DtTbl（数据在 `build/dtcal.json`）。
+>
+> **EEPROM 大小**：默认下载选项 `program_eeprom_split=65024` 只有 0.5 KB；本项目改成
+> **1 KB**：`python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\minidso_uart.hex`。
 
 ### 串口协议
 
@@ -264,6 +268,15 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 | 0x1A | DSO→PC | 波形滚动位置：`[0]offset(int8) [1]TriPos [2]running [3]最大偏移` |
 | 0x1B | PC→DSO | 设置滚动位置：`[0]=offset(int8)` |
 | 0x1C | PC→DSO | 运行/暂停：`[0]=1 运行 / 0 暂停` |
+| 0x1D / 0x1E | PC→DSO | 写/读输出波偏移表（21×int16，EEPROM 82..123） |
+| 0x1F / 0x20 | PC→DSO | 写/读延时模型系数 A1,B1,A2,B2,THR（5×uint16） |
+| 0x21 / 0x22 | PC→DSO | 读/写每档真实采样间隔 DtTbl（21×uint32，单位 0.01 µs，EEPROM 176..259） |
+| 0x13 | PC→DSO | 软复位回用户程序（不擦 EEPROM，用于验证掉电保存） |
+| 0x18 | PC→DSO | 读 IAP 地址 16 字节（诊断用，`[0..1]=地址`） |
+
+> DtTbl 是频率读数的查表值：烧录/擦除后为空，可用 `python py\dtt.py --nominal`
+> 按延时模型填标称值，或用 `python py\dtcal.py --all` 用 STM32 基准逐档实测写入。
+
 
 参数块（22 B）：`Lsb(u16) PlotMode ScaleH ScaleV_Auto RulerVMax(u16) RulerVMin(u16)
 TriLevel(u16) TriMode TriSlope WaveScroll Brightness OutPWM OutSIN OutUART
@@ -277,7 +290,7 @@ mini-dso/
 ├─ include/        头文件（cnfont.h 中文字模、bmp.h LOGO、keys.h …）
 ├─ user/main.c     主程序 + 中断 + 主循环
 ├─ build/          minidso.hex（原版）/ minidso_uart.hex（当前 v1.4.1）
-├─ py/             上位机与工具（dso_gui.py / flash.py / test_tb.py / gen_cnfont.py）
+├─ py/             上位机与工具（dso_gui.py / flash.py / dtcal.py / dtt.py / restore_all.py / refgen/）
 ├─ build.ps1       一键编译
 └─ README.md
 ```
@@ -294,6 +307,15 @@ mini-dso/
 - 旧的全局 `WaveScroll` 模式已停用（参数块里该字节固定为 0，只为协议兼容保留）
 - 不启用看门狗：长时基采样一轮 4.4 s，软件无法与卡死区分，会误复位
 - 暂停后恢复运行不会再清屏：先保留旧波形，等这轮扫描完成再刷新（慢时基约 4.4 s）
+- （v1.7.10 已修）EEPROM 保存死循环：`Save_Options()`/`Read_Options()` 里 DtTbl
+  校验和循环原来用 `uint8 i` 跑 `176..259`，i 到 255 回绕成 0 → 保存时 CPU 卡死、OLED 冻结。
+- （v1.7.10 已修）`EEPROM_Save/Read` 长度参数原是 `uint8`，263 被截断成 7 字节，
+  校准表/参数/DtTbl 实际上从未真正掉电保存。
+- 快档 15~20 的延时分辨力不足：100 µs 档实测采样间隔 ~8.8 µs（标签对应 4 µs），
+  150 µs 档 ~6.6 µs。频率读数已被 DtTbl 修正，但**屏幕时基标签与真实时间轴仍有偏差**，
+  后续要么改延时机制，要么按实测重贴档位标签。
+- 频率读数仍有 ~±4% 残差：`getWaveLength()` 的触发点取整数样点，周期估计有系统性偏差；
+  要更准需在触发边沿做亚样点插值。
 
 ### 许可
 

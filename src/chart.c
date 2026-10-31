@@ -190,6 +190,13 @@ void getWaveFreq()
 {
     uint16 m_num; //求和次数
     uint8 n_num;  //求平均值右移位数
+    uint16 wsum;  //窗口内波形长度总和(样点)
+    uint8 wnum;   //窗口内累计次数
+    uint32 dt100;
+    uint32 den;
+
+    wsum = WaveLength;
+    wnum = 1;
 
     //ADC停止采样时，每次动作都会显示波形频率，因此不求平均值
     if (!ADCRunning)
@@ -197,9 +204,7 @@ void getWaveFreq()
         WaveLengthSumNum = 0;
         WaveLengthSum = 0;
     }
-
-    //自动模式下为了让频率不频繁变动，取平均值，大于等于100ms区间不取平均值，一个原因是100ms波形变化慢，所以频率跳动不频繁，
-    //另一方面越长的时间区间取平均值的延迟越高，影响使用体验
+    //自动模式下为了让频率不频繁变动，取平均值，大于等于100ms区间不取平均值
     else if (TriMode == 0 && ScaleH > 4)
     {
         switch (ScaleH)
@@ -220,121 +225,35 @@ void getWaveFreq()
             n_num = 3;
             break;
         }
-    
 
         WaveLengthSum += WaveLength;
 
         //达到求和次数后
         if (++WaveLengthSumNum >= m_num)
         {
+            wsum = WaveLengthSum;
+            wnum = m_num;
             WaveLength = WaveLengthSum >> n_num; //求波长平均值
             WaveLengthSumNum = 0;                //清零波长求和次数
             WaveLengthSum = 0;                   //清零波长总和
         }
-
         //没达到求和次数，则返回，WaveFreq保持不变
         else
             return;
     }
 
-    switch (ScaleH)
+    /* 频率 = 1e8 / (每周期样点数 * 每样点时间(0.01us))
+       用 总和/次数 的分数形式计算, 避免波形长度取整带来的量化误差 */
+    dt100 = DtTbl[ScaleH];
+    if (dt100 < 100UL)
+        dt100 = 100UL;
+    if (wsum == 0)
     {
-    case 0: //500ms
-        WaveFreq = (float)50 / WaveLength + 0.5;
-        break;
-
-    case 1: //300ms
-        WaveFreq = 83 / WaveLength;
-        break;
-
-    case 2: //200ms
-        WaveFreq = 125 / WaveLength;
-        break;
-
-    case 3: //150ms
-        WaveFreq = 167 / WaveLength;
-        break;
-
-    case 4: //100ms
-        WaveFreq = 250 / WaveLength;
-        break;
-
-    case 5: //50ms
-        WaveFreq = 500 / WaveLength;
-        break;
-
-    case 6: //30ms
-        WaveFreq = 833 / WaveLength;
-        break;
-
-    case 7: //20ms
-        WaveFreq = 1250 / WaveLength;
-        break;
-
-    case 8: //15ms
-        WaveFreq = 1667 / WaveLength;
-        break;
-
-    case 9: //10ms
-        WaveFreq = 2500 / WaveLength;
-        break;
-
-    case 10: //5ms
-        WaveFreq = 5000 / WaveLength;
-        break;
-
-    case 11: //3ms
-        WaveFreq = 8333 / WaveLength;
-        break;
-
-    case 12: //2ms
-        WaveFreq = 12500 / WaveLength;
-        break;
-
-    case 13: //1.5ms
-        WaveFreq = 16667 / WaveLength;
-        break;
-
-    case 14: //1ms
-        WaveFreq = 25000 / WaveLength;
-        break;
-
-    case 15: //500us
-        WaveFreq = 50000 / WaveLength;
-        break;
-
-    case 16: //300us
-        WaveFreq = 83333 / WaveLength;
-        break;
-
-    case 17: //200us
-        WaveFreq = 125000 / WaveLength;
-        break;
-
-    case 18: //150us
-        WaveFreq = 166667 / WaveLength;
-        break;
-
-    case 19: //100us
-        WaveFreq = 161290 / WaveLength;
-        break;
-
-    default: //70us
-        WaveFreq = 312500 / WaveLength;
-        break;
+        WaveFreq = 0;
+        return;
     }
-    /* fixed: frequency from the calibrated sample interval (0.01us units) */
-    {
-        uint32 dt100 = DtTbl[ScaleH];
-
-        if (dt100 < 100UL)
-            dt100 = 100UL;
-        if (WaveLength == 0)
-            WaveFreq = 0;
-        else
-            WaveFreq = (float)(100000000UL / ((uint32)WaveLength * dt100));
-    }
-
+    den = (uint32)wsum * dt100;
+    WaveFreq = (uint32)(((uint32)100000000UL * (uint32)wnum) / den);
 }
 
 /* 将mv转换为ADC

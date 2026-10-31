@@ -65,10 +65,17 @@ void Reset_Handler(void)
     /* 4) PA0 = 复用推挽输出 (MODE=11, CNF=10 -> 0xB) */
     GPIOA_CRL = (GPIOA_CRL & ~0xFu) | 0xBu;
 
-    /* 5) TIM2: 72MHz/(71+1)=1MHz 计数, ARR=999 -> 1kHz, CCR1=500 -> 50% */
-    TIM2_PSC = 71;      /* 72MHz/72 = 1MHz */
-    TIM2_ARR = 999;     /* 1MHz/1000 = 1 kHz */
-    TIM2_CCR1 = 500;
+    /* 5) TIM2: f = 72MHz / ((PSC+1) * (ARR+1)), 50% 占空比
+       默认 1kHz (PSC=71, ARR=999)；可用 -DREFGEN_PSC=.. -DREFGEN_ARR=.. 覆盖 */
+#ifndef REFGEN_PSC
+#define REFGEN_PSC 71
+#endif
+#ifndef REFGEN_ARR
+#define REFGEN_ARR 999
+#endif
+    TIM2_PSC = REFGEN_PSC;
+    TIM2_ARR = REFGEN_ARR;
+    TIM2_CCR1 = (REFGEN_ARR + 1) / 2;
     TIM2_CCMR1 = (6u << 4);               /* OC1M = PWM mode 1 */
     TIM2_CCER = (1u << 0);                /* CC1E */
     TIM2_EGR = 1u;                        /* UG: 载入预分频/ARR */

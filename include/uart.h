@@ -32,7 +32,10 @@
 #define UART_T_SET      0x10
 #define UART_T_SAVE     0x11
 #define UART_T_GET      0x12
-#define UART_T_REBOOT   0x14   /* 软复位进 ISP 下载模式(自动烧录用) */
+#define UART_T_REBOOT   0x14
+#define UART_T_REBOOT_USER 0x13
+#define UART_T_IAPR   0x18
+#define UART_T_DIAG   0x30   /* step-by-step IAP diagnostics */   /* read 16 bytes at IAP address (diag) */ /* soft reset to user code, EEPROM kept */   /* 软复位进 ISP 下载模式(自动烧录用) */
 #define UART_T_TEST     0x15   /* 设置 P1.1 测试方波分频(慢档校时基用), 参数=16bit 分频*/
 #define UART_T_CAL_W    0x16   /* 写入时基校准表: 21 x uint16 小端 (42 字节) */
 #define UART_T_CAL_R    0x17
@@ -55,6 +58,7 @@ void UART_IsrBody(void);
 void UART_Poll(void);
 void UART_WriteByte(uint8 b);
 void UART_SendFrame(uint8 type, uint8 *buf, uint16 len);
+uint16 UART_TxFree(void);
 void UART_SendSamples(void);
 uint8 UART_GetSettings(uint8 *s);
 void UART_ApplySettings(uint8 *s);

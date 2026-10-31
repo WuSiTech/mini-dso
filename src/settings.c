@@ -66,7 +66,6 @@ void WaveFreq_Update(void)
 
     if (WaveFreqIdx > 5)
         WaveFreqIdx = 2;
-    DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
     WaveDiv = WaveDivTab[WaveFreqIdx];
 
     /* per-step period (0.1us) plus calibration offset -> Q8 ticks */
@@ -867,13 +866,18 @@ static void Load_Defaults(void)
     WaveType = 0;
     WaveFreqIdx = 2;
     DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
+    /* 信号源系数默认值: 1 tick = GEN_TICK_US10/10 us, 六档步进标称周期(0.1us) */
+    GenTickCal = GEN_TICK_US10;
+    WaveStepCal[0] = 17760; WaveStepCal[1] = 8880; WaveStepCal[2] = 4440;
+    WaveStepCal[3] = 2220;  WaveStepCal[4] = 1110; WaveStepCal[5] = 555;
     Lang = 1;
 }
 
 bit Save_Options()
 {
     uint8 *p;
-    uint8 i, sum;
+    uint16 i;   /* MUST be uint16: the DtTbl checksum loop goes 176..259 */
+    uint8 sum;
 
     check_Options();
     p = EeBuf;
@@ -983,7 +987,8 @@ bit Save_Options()
 void Read_Options()
 {
     uint8 *p;
-    uint8 i, sum, ok;
+    uint16 i;   /* MUST be uint16: the DtTbl checksum loop goes 176..259 */
+    uint8 sum, ok;
 
     EEPROM_Read(EeBuf, 263);
 
@@ -994,6 +999,7 @@ void Read_Options()
     if (EeBuf[77] != 'M' || EeBuf[78] != 'S' || EeBuf[79] != sum)
     {
         Load_Defaults();
+        DtTbl_Defaults();   /* DtTbl 尚未初始化, 先按延时模型建默认表 */
         EepromValid = 0;
         WaveScroll = 0;
         check_Options();
@@ -1042,6 +1048,10 @@ void Read_Options()
         DtB2 = (uint16)EeBuf[134] | ((uint16)EeBuf[135] << 8);
         DtThr = (uint16)EeBuf[136] | ((uint16)EeBuf[137] << 8);
     }
+    else
+    {
+        DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
+    }
 
     /* per-range sample intervals */
     sum = 0;
@@ -1053,10 +1063,6 @@ void Read_Options()
             DtTbl[i] = (uint32)EeBuf[176 + i * 4] | ((uint32)EeBuf[176 + i * 4 + 1] << 8)
                        | ((uint32)EeBuf[176 + i * 4 + 2] << 16) | ((uint32)EeBuf[176 + i * 4 + 3] << 24);
     }
-    else
-    {
-        DtTbl_Defaults();
-    }
 
     /* generator coefficients */
     sum = 0;
@@ -1067,6 +1073,19 @@ void Read_Options()
         GenTickCal = (uint16)EeBuf[142] | ((uint16)EeBuf[143] << 8);
         for (i = 0; i < 6; i++)
             WaveStepCal[i] = (uint16)EeBuf[144 + i * 2] | ((uint16)EeBuf[145 + i * 2] << 8);
+    }
+    /* 0 值保护: 旧 EEPROM/擦除后可能存进全 0, 会让波形输出频率完全不对 */
+    if (GenTickCal == 0)
+        GenTickCal = GEN_TICK_US10;
+    {
+        uint8 gi;
+        for (gi = 0; gi < 6; gi++)
+            if (WaveStepCal[gi] == 0)
+            {
+                WaveStepCal[0] = 17760; WaveStepCal[1] = 8880; WaveStepCal[2] = 4440;
+                WaveStepCal[3] = 2220;  WaveStepCal[4] = 1110; WaveStepCal[5] = 555;
+                break;
+            }
     }
 
     /* output offsets: valid magic+checksum, otherwise zero (nominal) */
@@ -1103,8 +1122,18 @@ void Read_Options()
     WaveScroll = 0;   /* 旧滚动模式已停用(改用暂停+光标指滚动条) */
     if (WaveFreqIdx > 5)
         WaveFreqIdx = 2;
-    DtA1 = 12955; DtB1 = 1800; DtA2 = 14258; DtB2 = 1550; DtThr = 300;
     WaveDiv = WaveDivTab[WaveFreqIdx];
+
+    /* DtTbl validity: rebuild from the delay model if uninitialized/invalid */
+    {
+        uint8 bad = 0;
+        for (i = 0; i < 21; i++)
+            if (DtTbl[i] == 0 || DtTbl[i] > 4000000UL)
+                bad = 1;
+        if (bad)
+            DtTbl_Defaults();
+    }
+
     EepromValid = ok;   /* cpv - 供开机自检 */
 
     check_Options(); /* 检查选项合法性 */

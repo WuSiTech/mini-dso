@@ -38,6 +38,9 @@
 
 #ifndef uint8
 #define uint8 unsigned char
+void InitDelayTable(void);
+void switch_Dealy(uint8 scale_h);
+
 #endif
 
 #ifndef uint16

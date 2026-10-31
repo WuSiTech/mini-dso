@@ -52,7 +52,10 @@ Start Address of Sector
 Each Sector contains 512 bytes*/
 #define IAP_ADDRESS 0x0000
 
-bit EEPROM_Save(uint8 *s, uint8 para_num);
-void EEPROM_Read(uint8 *s, uint8 para_num);
+uint8 IapReadByte(uint16 addr);
+void IapProgramByte(uint16 addr, uint8 dat);
+void IapEraseSector(uint16 addr);
+bit EEPROM_Save(uint8 *s, uint16 para_num);
+void EEPROM_Read(uint8 *s, uint16 para_num);
 
 #endif

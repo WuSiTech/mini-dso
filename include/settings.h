@@ -55,11 +55,13 @@
 
 void Change_Val(bit);
 void SetGenParams(void);
+void WaveFreq_Update(void);
 void Output_Update(void); //cpv - 按 Output PWM/SIN 开关设置输出状态
 bit Save_Options();
 //cpv uint8 Save_Options();  // cpv
 void Read_Options();
 void check_Options();
+bit Setting_IsNumeric(void);
 void Check_MinTimeInterval();
 
 #endif

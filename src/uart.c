@@ -18,6 +18,7 @@
 
 #define UART_TX_SIZE 512
 #define UART_RX_SIZE 128
+#define UART_FRAME_MAX 128 /* max command payload (DtTbl write = 84 B) */
 
 /* 发送环形缓冲 (xdata) */
 static __xdata uint8 UartTx[UART_TX_SIZE];
@@ -31,7 +32,7 @@ static uint8 UartRxHead;
 static uint8 UartRxTail;
 
 /* 接收帧解析 */
-static __xdata uint8 FrameBuf[64]; /* 命令负载缓冲(校准表 42 字节) */
+static __xdata uint8 FrameBuf[UART_FRAME_MAX]; /* 命令负载缓冲(校准表 42 字节) */
 static __xdata uint8 CalBuf[42]; /* 时基校准表收发缓冲 */ /* 命令负载最大 18 字节 */
 static uint8 FrameType;
 static uint16 FrameLen;
@@ -89,6 +90,14 @@ void UART_WriteByte(uint8 b)
 }
 
 /* 发送一整帧；缓冲空间不够则整帧丢弃，避免半帧 */
+uint16 UART_TxFree(void)
+{
+    uint16 used = UartTxHead + UART_TX_SIZE - UartTxTail;
+    if (used >= UART_TX_SIZE)
+        used -= UART_TX_SIZE;
+    return (UART_TX_SIZE - 1) - used;
+}
+
 void UART_SendFrame(uint8 type, uint8 *buf, uint16 len)
 {
     uint16 i;
@@ -296,12 +305,122 @@ static void UART_HandleFrame(void)
         IAP_CONTR = 0x60; /* SWBS=1, SWRST=1: 软复位并从 ISP 监控区启动 */
         break;
 
+    case UART_T_REBOOT_USER:
+        /* 软复位回用户程序(SWBS=0, 不擦 EEPROM): 用来验证参数是否真的掉电保存 */
+        s[0] = 0;
+        s[1] = 1;
+        UART_SendFrame(UART_T_ACK, s, 2);
+        {
+            uint16 wd;
+            for (wd = 0; wd < 30; wd++)
+                Delay500us(); /* 等 ACK 发完再复位 */
+        }
+        EA = 0;
+        IAP_CONTR = 0x20; /* SWRST=1, SWBS=0: reboot to user code */
+        break;
+
+    case UART_T_IAPR: /* diag: read 16 bytes at raw IAP address [0]=lo [1]=hi */
+    {
+        uint16 ia;
+        uint8 ii;
+        ia = (uint16)FrameBuf[0] | ((uint16)FrameBuf[1] << 8);
+        for (ii = 0; ii < 16; ii++)
+            s[ii] = IapReadByte((uint16)(ia + ii));
+        UART_SendFrame(UART_T_IAPR, s, 16);
+        break;
+    }
+
+    case UART_T_DIAG:
+    {
+        uint8 sub = FrameBuf[0];
+        uint8 ii;
+        uint16 kk;
+        static __xdata uint8 diagbuf[8];
+        static __xdata uint8 big[264];
+        s[0] = 0x5A;
+        s[1] = sub;
+        UART_SendFrame(UART_T_ACK, s, 2);   /* 'arrived' ack */
+        {
+            uint16 wd;
+            for (wd = 0; wd < 20; wd++)
+                Delay500us();               /* let the ack go out first */
+        }
+        switch (sub)
+        {
+        case 0:
+            check_Options();
+            break;
+        case 1:
+            IapProgramByte(0x0000, 0x55);
+            break;
+        case 2:
+            IapEraseSector(0x0000);
+            break;
+        case 3:
+            for (ii = 0; ii < 8; ii++)
+                diagbuf[ii] = (uint8)(0xA0 + ii);
+            EEPROM_Save(diagbuf, 8);
+            for (ii = 0; ii < 8; ii++)
+                s[2 + ii] = IapReadByte(0x0000 + ii);
+            break;
+        case 4:
+            Save_Options();
+            break;
+        case 5:   /* save length threshold, ack after each length */
+        {
+            static const uint16 code lens[10] = {8, 32, 64, 96, 128, 160, 192, 224, 256, 263};
+            uint8 li;
+            for (kk = 0; kk < 264; kk++)
+                big[kk] = (uint8)(kk & 0xFF);
+            for (li = 0; li < 10; li++)
+            {
+                kk = lens[li];
+                EEPROM_Save(big, kk);
+                s[0] = 0x5A;
+                s[1] = 5;
+                s[2] = (uint8)kk;
+                UART_SendFrame(UART_T_ACK, s, 3);
+            }
+            break;
+        }
+        case 6:   /* program/read 16 bytes at 0x0100+, ack per byte */
+            for (ii = 0; ii < 16; ii++)
+            {
+                IapProgramByte((uint16)(0x0100 + ii), (uint8)(0x30 + ii));
+                s[0] = 0x5A;
+                s[1] = 6;
+                s[2] = ii;
+                s[3] = IapReadByte((uint16)(0x0100 + ii));
+                UART_SendFrame(UART_T_ACK, s, 4);
+            }
+            break;
+        case 7:   /* save 263 bytes of 0xFF */
+            for (kk = 0; kk < 263; kk++)
+                big[kk] = 0xFF;
+            EEPROM_Save(big, 263);
+            break;
+        default:
+            break;
+        }
+        s[0] = sub;
+        s[1] = 0xAA;
+        UART_SendFrame(UART_T_ACK, s, (uint16)(sub == 3 ? 10 : 2));
+        break;
+    }
+
     case UART_T_CAL_W: /* 写入时基校准表(42 字节) */
         if (FrameLen >= 42)
         {
             uint8 ci;
             for (ci = 0; ci < 21; ci++)
                 CalTable[ci] = (uint16)FrameBuf[ci * 2] | ((uint16)FrameBuf[ci * 2 + 1] << 8);
+            /* 时基表变了: 若 DtTbl 还没标定过, 先按新表+延时模型重建 */
+            for (ci = 0; ci < 21; ci++)
+                if (DtTbl[ci] == 0)
+                {
+                    DtTbl_Defaults();
+                    break;
+                }
             EA = 0;
             ok = Save_Options();
             EA = 1;
@@ -388,7 +507,17 @@ static void UART_HandleFrame(void)
             dbuf[di * 4 + 2] = (uint8)((DtTbl[di] >> 16) & 0xFF);
             dbuf[di * 4 + 3] = (uint8)((DtTbl[di] >> 24) & 0xFF);
         }
-        UART_SendFrame(UART_T_DTT, dbuf, 84);
+        {
+            uint8 w8;
+            /* sample frames may occupy the tx ring; wait at most ~40ms for room */
+            for (w8 = 0; w8 < 80; w8++)
+            {
+                if (UART_TxFree() >= 96)
+                    break;
+                Delay500us();
+            }
+            UART_SendFrame(UART_T_DTT, dbuf, 84);
+        }
         break;
     }
     case UART_T_DTTW:
@@ -485,6 +614,9 @@ static void UART_HandleFrame(void)
         break;
 
     default:
+        s[0] = FrameType;
+        s[1] = 0xEE; /* unknown command marker */
+        UART_SendFrame(UART_T_ACK, s, 2);
         break;
     }
 }
@@ -531,7 +663,7 @@ void UART_Poll(void)
             FrameLen |= b;
             FrameSum += b;
             FrameIdx = 0;
-            if (FrameLen > 64)
+            if (FrameLen > UART_FRAME_MAX)
                 ParseState = 0;
             else if (FrameLen == 0)
                 ParseState = 6;

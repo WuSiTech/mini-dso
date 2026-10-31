@@ -70,7 +70,7 @@ void IapEraseSector(uint16 addr)
 /* Write EEPROM
    s: Pointer to parameters
    para_num: Length of parameters */
-bit EEPROM_Save(uint8 *s, uint8 para_num)
+bit EEPROM_Save(uint8 *s, uint16 para_num)
 {
     int i; //不要改成uint8，误改了好几次！！
 	//扇区擦除
@@ -99,9 +99,9 @@ bit EEPROM_Save(uint8 *s, uint8 para_num)
 /* Read EEPROM
    s: Pointer to parameters
    para_num: Length of parameters */
-void EEPROM_Read(uint8 *s, uint8 para_num)
+void EEPROM_Read(uint8 *s, uint16 para_num)
 {
-    uint8 i;
+    uint16 i;
 
     for (i = 0; i < para_num; i++) 
     {

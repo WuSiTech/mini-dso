@@ -524,7 +524,7 @@ class App:
         self.scr_lbl = tk.Label(sf, text="滚动", width=5, anchor="w")
         self.scr_lbl.pack(side="left")
         self.scr_var = tk.DoubleVar(value=0)
-        self.scr_scale = ttk.Scale(sf, from_=-100, to=100, orient="horizontal",
+        self.scr_scale = ttk.Scale(sf, from_=0, to=120, orient="horizontal",
                                    variable=self.scr_var, command=self._on_scroll_slider)
         self.scr_scale.pack(side="left", fill="x", expand=True)
         self.scr_val = tk.Label(sf, text="0", width=5, anchor="e")
@@ -1052,6 +1052,8 @@ class App:
             val = int(round(float(v)))
         except Exception:
             return
+        if val < 0:
+            val = 0
         self.scr_val.config(text=str(val))
         if getattr(self, "_scr_sync", False):
             return
@@ -1071,10 +1073,14 @@ class App:
             pass
 
     def _toggle_pause(self):
+        """暂停/继续: 让单片机一起停/走(0x1C), 上位机界面本身不冻结"""
         self.paused = not self.paused
-        self._btnpause("继续" if self.paused else "暂停")
-        self._status(("已暂停" if self.paused else "运行") + "  (接收计数继续)")
+        self.btn_pause.config(text=self._tr("继续" if self.paused else "暂停"))
+        if self.link and not self.demo:
+            self._send(build_frame(0x1C, bytes([0 if self.paused else 1])))
+        self._set_scroll_enabled(self.paused)
         self._redraw(force=True)
+
 
     def _save_wave(self):
         sp = self.last
@@ -1495,7 +1501,7 @@ class App:
     def _on_frame(self, type_, payload):
         if type_ == T_SAMPLE:
             sp = parse_sample(payload)
-            if sp and not self.paused:
+            if sp:
                 self.samples = sp["raw"]
                 self.last = sp
         elif type_ == T_ACK:
@@ -1506,6 +1512,15 @@ class App:
         elif type_ == 0x1A:
             if len(payload) >= 4:
                 off = payload[0] - 256 if payload[0] > 127 else payload[0]
+                mx = payload[3] if payload[3] > 0 else 120
+                try:
+                    self.scr_scale.config(to=mx)
+                except Exception:
+                    pass
+                if off < 0:
+                    off = 0
+                if off > mx:
+                    off = mx
                 self._scr_sync = True
                 try:
                     if not getattr(self, "_scr_drag", False):

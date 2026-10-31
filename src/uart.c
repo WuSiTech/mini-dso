@@ -319,8 +319,27 @@ static void UART_HandleFrame(void)
         s[0] = (uint8)TriPosOffset;
         s[1] = TriPos;
         s[2] = ADCRunning ? 1 : 0;
-        s[3] = 100;
+        s[3] = (uint8)(SAMPLE_NUM - 50 - 1 - (int16)TriPos);  /* 最大正偏移 */
         UART_SendFrame(UART_T_SCRL, s, 4);
+        break;
+
+    case UART_T_RUN:    /* 运行/暂停: payload[0] 1=运行 0=暂停 */
+        if (FrameLen >= 1)
+        {
+            ADCRunning = FrameBuf[0] ? 1 : 0;
+            WaveUpdate = 0;
+            ClearWave = 0;
+            DisplayUpdate = 1;
+            ADCInterrupt = 1;
+            s[0] = 0;
+            s[1] = 1;
+        }
+        else
+        {
+            s[0] = 1;
+            s[1] = 0;
+        }
+        UART_SendFrame(UART_T_ACK, s, 2);
         break;
 
     case UART_T_SCRS:   /* 设滚动位置: payload[0] = int8 offset */

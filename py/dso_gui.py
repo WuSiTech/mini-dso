@@ -734,6 +734,22 @@ class App:
             wavetype=int(self.v_wavetype.get()), lang=int(self.v_lang.get()),
         )
 
+    def _on_enum_change(self):
+        """下拉框(字符串) -> IntVar, 然后下发参数"""
+        try:
+            self.v_genfreq.set(GEN_FREQ_TXT.index(self.v_genfreq_txt.get()))
+        except Exception:
+            self.v_genfreq.set(0)
+        try:
+            self.v_wavetype.set(WAVE_TYPE_TXT.index(self.v_wavetype_txt.get()))
+        except Exception:
+            self.v_wavetype.set(0)
+        try:
+            self.v_lang.set(LANG_TXT.index(self.v_lang_txt.get()))
+        except Exception:
+            self.v_lang.set(0)
+        self._schedule_apply()
+
     def _schedule_apply(self):
         if self._updating:
             return

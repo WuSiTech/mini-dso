@@ -1,4 +1,4 @@
-# Mini-DSO v1.2 — STC8A8K64D4 @ 45 MHz
+# Mini-DSO v1.4 — STC8A8K64D4 @ 45 MHz
 
 **中文** | [English](#english-version)
 

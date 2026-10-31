@@ -77,7 +77,6 @@ TR_C2E = {
     "扫描到波特率: ": "Detected baud: ",
     "校准完成并写入 EEPROM": "Calibration written to EEPROM",
     "校准写入失败": "Calibration write failed",
-    "正在扫描波特率...": "Scanning baud rates...",
     "未收到任何数据": "No data received",
     "保存波形 (CSV)": "Save wave (CSV)",
     "保存截图 (PNG)": "Save shot (PNG)",
@@ -95,7 +94,6 @@ TR_C2E = {
     "连接失败": "Connect failed",
     "请选择串口": "Select a port",
     "一键校准": "Calibrate",
-    "扫描波特率": "Scan bauds",
     "绘图模式": "Plot mode",
     "电压量程": "Range",
     "触发电平": "Trig level",
@@ -520,6 +518,21 @@ class App:
         self.canvas.bind("<ButtonRelease-1>", lambda e: setattr(self, "_cur_drag", None))
         self.canvas.bind("<Double-Button-1>", self._on_double)
         self.canvas.bind("<Shift-Button-1>", self._on_shift_click)
+        # 波形滚动条(与单片机同步, 仅暂停时可用)
+        sf = tk.Frame(left)
+        sf.pack(fill="x", padx=6, pady=(0, 2))
+        self.scr_lbl = tk.Label(sf, text="滚动", width=5, anchor="w")
+        self.scr_lbl.pack(side="left")
+        self.scr_var = tk.DoubleVar(value=0)
+        self.scr_scale = ttk.Scale(sf, from_=-100, to=100, orient="horizontal",
+                                   variable=self.scr_var, command=self._on_scroll_slider)
+        self.scr_scale.pack(side="left", fill="x", expand=True)
+        self.scr_val = tk.Label(sf, text="0", width=5, anchor="e")
+        self.scr_val.pack(side="left")
+        self.scr_scale.config(state="disabled")
+        self.scr_scale.bind("<ButtonPress-1>", lambda e: setattr(self, "_scr_drag", True))
+        self.scr_scale.bind("<ButtonRelease-1>", lambda e: setattr(self, "_scr_drag", False))
+
         self.hexlabel = tk.Label(left, text="", anchor="w", font=("Consolas", 9), fg="#666")
         self.hexlabel.pack(fill="x", padx=8)
 
@@ -592,7 +605,6 @@ class App:
         self.btn_connect = tk.Button(box, text="连接", width=5, command=self._toggle_connect)
         self.btn_connect.pack(side="left", padx=1)
         tk.Button(box, text="刷新", width=4, command=self._refresh_ports).pack(side="left", padx=1)
-        tk.Button(panel, text="扫描波特率", command=self._scan_bauds).pack(fill="x", padx=3, pady=(0, 3))
 
         # --- 示波器参数 ---
         p = tk.LabelFrame(panel, text="示波器参数（旋转即刻生效）")
@@ -610,7 +622,6 @@ class App:
         self.v_tri = tk.IntVar(value=1600)
         self.v_slope = tk.IntVar(value=1)
         self.v_trmode = tk.StringVar(value="Auto")
-        self.v_wscroll = tk.IntVar(value=0)
         self.v_outpwm = tk.IntVar(value=1)
         self.v_outsin = tk.IntVar(value=1)
         self.v_outuart = tk.IntVar(value=1)
@@ -696,12 +707,6 @@ class App:
         ttk.Combobox(p, textvariable=self.v_trmode, values=TRI_MODE_TXT, width=7,
                      state="readonly").grid(row=row, column=1, sticky="w")
         self.v_trmode.trace_add("write", lambda *a: self._schedule_apply())
-        row += 1
-
-        # 滚动模式
-        lab("滚动模式")
-        tk.Checkbutton(p, text="WaveScroll", variable=self.v_wscroll,
-                       command=self._schedule_apply).grid(row=row, column=1, sticky="w")
         row += 1
 
         # 输出开关
@@ -949,7 +954,7 @@ class App:
             scaleh=int(self.v_scaleh.get()), scalev_auto=int(self.v_auto.get()),
             rulervmax=int(self.v_vmax.get()), rulervmin=int(self.v_vmin.get()),
             trilevel=int(self.v_tri.get()), trimode=TRI_MODE_TXT.index(self.v_trmode.get()),
-            trislope=int(self.v_slope.get()), wavescroll=int(self.v_wscroll.get()),
+            trislope=int(self.v_slope.get()), wavescroll=0,
             brightness=int(self.v_brt.get()),
             outpwm=int(self.v_outpwm.get()), outsin=int(self.v_outsin.get()),
             outuart=int(self.v_outuart.get()),
@@ -1022,7 +1027,6 @@ class App:
             self.v_tri.set(s["trilevel"])
             self.v_slope.set(1 if s["trislope"] else 0)
             self.v_trmode.set(TRI_MODE_TXT[s["trimode"]] if 0 <= s["trimode"] < 3 else "Auto")
-            self.v_wscroll.set(1 if s.get("wavescroll") else 0)
             self.v_brt.set(s["brightness"])
             self.v_outpwm.set(1 if s["outpwm"] else 0)
             self.v_outsin.set(1 if s["outsin"] else 0)
@@ -1042,6 +1046,30 @@ class App:
         self._updating = False
 
     # ---------------- 暂停 / 保存 ----------------
+    # ---------------- 波形滚动条(与 MCU 同步) ----------------
+    def _on_scroll_slider(self, v):
+        try:
+            val = int(round(float(v)))
+        except Exception:
+            return
+        self.scr_val.config(text=str(val))
+        if getattr(self, "_scr_sync", False):
+            return
+        now = time.time()
+        if now - getattr(self, "_scr_last_send", 0.0) < 0.10:
+            return
+        self._scr_last_send = now
+        if self.link and not self.demo:
+            self._send(build_frame(0x1B, bytes([val & 0xFF])))
+
+    def _set_scroll_enabled(self, enabled):
+        try:
+            st = "normal" if enabled else "disabled"
+            if str(self.scr_scale.cget("state")) != st:
+                self.scr_scale.config(state=st)
+        except Exception:
+            pass
+
     def _toggle_pause(self):
         self.paused = not self.paused
         self._btnpause("继续" if self.paused else "暂停")
@@ -1392,51 +1420,6 @@ class App:
             self.rx_queue.put(("cal_fail", str(exc)))
 
     # ---------------- 波特率扫描 ----------------
-    def _scan_bauds(self):
-        if self.demo or self.scanning:
-            return
-        if not HAVE_SERIAL:
-            self._hint("需要 pyserial")
-            return
-        port = self.port_var.get().strip()
-        if not port:
-            self._hint("先选择串口")
-            return
-        self.scanning = True
-        self._hint("正在扫描波特率...")
-        threading.Thread(target=self._scan_worker, args=(port,), daemon=True).start()
-
-    def _scan_worker(self, port):
-        found = None
-        for baud in BAUD_CANDIDATES:
-            try:
-                ser = serial.Serial(port, baud, timeout=0.05)
-            except Exception:
-                continue
-            parser = FrameParser()
-            ok = False
-            try:
-                for _ in range(3):
-                    ser.write(build_frame(T_GET))
-                    t0 = time.time()
-                    while time.time() - t0 < 0.35:
-                        data = ser.read(256)
-                        if data and parser.feed(data):
-                            ok = True
-                            break
-                    if ok:
-                        break
-            except Exception:
-                pass
-            try:
-                ser.close()
-            except Exception:
-                pass
-            if ok:
-                found = baud
-                break
-        self.rx_queue.put(("scan_done", found))
-
     # ---------------- 事件循环 ----------------
     def _tick(self):
         handled = 0
@@ -1469,13 +1452,7 @@ class App:
                 self._msg("校准失败: " + str(data))
             elif kind == "autodetect":
                 self._on_autodetect(data)
-            elif kind == "scan_done":
-                self.scanning = False
-                if data:
-                    self.baud_var.set(str(data))
-                    self._hint("扫描到波特率 %d，请点连接" % data)
-                else:
-                    self._hint("所有候选波特率都收不到有效帧：检查固件/UART版、TXD-RXD 交叉、共地、Output UART=ON")
+
 
         now = time.time()
         if self.pending_save and now - self.pending_save > 1.5:
@@ -1487,12 +1464,21 @@ class App:
                 if self.link.rx_bytes == 0:
                     self._hint("未收到任何数据：确认固件已烧录、TXD/RXD 交叉、共地、Output UART=ON")
                 else:
-                    self._hint("收到 %d 字节但没有有效帧：波特率可能不对，点“扫描波特率”"
+                    self._hint("收到 %d 字节但没有有效帧：检查波特率/接线/TXD-RXD"
                                           % self.link.rx_bytes)
+
+        now = time.time()
+        if now - getattr(self, "_scr_last_poll", 0.0) > 0.25:
+            self._scr_last_poll = now
+            self._poll_scroll()
 
         self._redraw()
         self._update_status()
         self.root.after(30, self._tick)
+
+    def _poll_scroll(self):
+        if self.link and not self.demo:
+            self._send(build_frame(0x1A))
 
     def _update_status(self):
         if self.demo or not self.link:
@@ -1517,6 +1503,17 @@ class App:
                 self.pending_save = 0.0
                 self._msg("Save succeed" if payload[1] else "Save failed!")
                 self._hint("")
+        elif type_ == 0x1A:
+            if len(payload) >= 4:
+                off = payload[0] - 256 if payload[0] > 127 else payload[0]
+                self._scr_sync = True
+                try:
+                    if not getattr(self, "_scr_drag", False):
+                        self.scr_var.set(off)
+                        self.scr_val.config(text=str(off))
+                finally:
+                    self._scr_sync = False
+                self._set_scroll_enabled(payload[2] == 0)   # 暂停(running=0)才可拖
         elif type_ == T_INFO:
             if len(payload) >= 3:
                 self.fw_ver = "v%d.%d.%d" % (payload[0], payload[1], payload[2])

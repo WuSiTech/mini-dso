@@ -768,6 +768,7 @@ void Read_Options()
             CalTable[i] = ((uint16)EeBuf[34 + i * 2 + 1] << 8) | EeBuf[34 + i * 2];
     }
 
+    WaveScroll = 0;   /* 旧滚动模式已停用(改用暂停+光标指滚动条) */
     EepromValid = ok;   /* cpv - 供开机自检 */
 
     check_Options(); /* 检查选项合法性 */

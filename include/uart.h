@@ -36,7 +36,9 @@
 #define UART_T_TEST     0x15   /* 设置 P1.1 测试方波分频(慢档校时基用), 参数=16bit 分频*/
 #define UART_T_CAL_W    0x16   /* 写入时基校准表: 21 x uint16 小端 (42 字节) */
 #define UART_T_CAL_R    0x17
-#define UART_T_INFO   0x19   /* 固件版本/能力 */   /* 读取时基校准表: 回复 42 字节 */   /* 设置 P1.1 测试方波分频(慢档校时基用), 参数=16bit 分频*/
+#define UART_T_INFO   0x19
+#define UART_T_SCRL   0x1A   /* 读取波形滚动位置 */
+#define UART_T_SCRS   0x1B   /* 设置波形滚动位置(int8 偏移) */   /* 固件版本/能力 */   /* 读取时基校准表: 回复 42 字节 */   /* 设置 P1.1 测试方波分频(慢档校时基用), 参数=16bit 分频*/
 
 #define UART_SETTINGS_LEN 22
 #define UART_SAMP_NUM     100    /* sampled points sent to PC */

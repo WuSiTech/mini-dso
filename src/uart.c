@@ -315,6 +315,31 @@ static void UART_HandleFrame(void)
         UART_SendFrame(UART_T_ACK, s, 2);
         break;
 
+    case UART_T_SCRL:   /* 读滚动位置: [0]offset [1]TriPos [2]running [3]宽度 */
+        s[0] = (uint8)TriPosOffset;
+        s[1] = TriPos;
+        s[2] = ADCRunning ? 1 : 0;
+        s[3] = 100;
+        UART_SendFrame(UART_T_SCRL, s, 4);
+        break;
+
+    case UART_T_SCRS:   /* 设滚动位置: payload[0] = int8 offset */
+        if (FrameLen >= 1)
+        {
+            TriPosOffset = (int8)FrameBuf[0];
+            WaveUpdate = 1;
+            DisplayUpdate = 1;
+            s[0] = 0;
+            s[1] = 1;
+        }
+        else
+        {
+            s[0] = 1;
+            s[1] = 0;
+        }
+        UART_SendFrame(UART_T_ACK, s, 2);
+        break;
+
     case UART_T_INFO:
         s[0] = FW_VER_MAJOR;
         s[1] = FW_VER_MINOR;

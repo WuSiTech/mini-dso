@@ -5,10 +5,12 @@
 #include "STC8A8K64S4A12.H"
 #include "global.h"
 #include "config_stc.h"
+#include "settings.h"
 #include "keys.h"
 
 #define KEY_DEBOUNCE_MS 10
 #define KEY_LONG_MS     500
+#define KEY_DBL_MS      300
 
 __xdata uint16 AppMs = 0;
 
@@ -20,10 +22,14 @@ static __xdata uint16 KeyDownMs = 0;
 /* 计时在 Timer0(1ms) 里判定, 动作留给主循环执行 */
 static bit PendLong = 0;
 static bit PendSingle = 0;
+static bit PendDouble = 0;
+static __xdata uint8 ClickCnt = 0;
+static __xdata uint16 LastClickMs = 0;
 
 
 static void Key_Long(void);
 static void Key_Single(void);
+static void Key_DoubleSettings(void);
 
 /* ---------------- 按键 ---------------- */
 void Key_Isr(void)
@@ -65,7 +71,24 @@ void Key_Tick(void)
                 KeyRotated = 0;          /* 按住旋转过, 不算点击 */
             else if (d >= KEY_DEBOUNCE_MS)
             {
-                PendSingle = 1;          /* 立刻排队: 下一圈主循环就执行 */
+                /* 设置页里: 300ms 内按两下 = 取消修改; 主页不识别双击 */
+                if (InSettings)
+                {
+                    if (ClickCnt && (uint16)(AppMs - LastClickMs) <= KEY_DBL_MS)
+                    {
+                        ClickCnt = 0;
+                        PendDouble = 1;
+                    }
+                    else
+                    {
+                        ClickCnt = 1;
+                        LastClickMs = AppMs;
+                    }
+                }
+                else
+                {
+                    PendSingle = 1;
+                }
                 ADCInterrupt = 1;
             }
         }
@@ -86,6 +109,11 @@ void Key_Poll(void)
     {
         PendLong = 0;
         Key_Long();
+    }
+    else if (PendDouble)
+    {
+        PendDouble = 0;
+        Key_DoubleSettings();
     }
     else if (PendSingle)
     {
@@ -115,8 +143,14 @@ static void Key_Long(void)
     }
     if (InSettings && CalPage)
     {
+        /* 校准表页长按: 立即写 EEPROM 并提示保存成功 */
+        EA = 0;
+        ShowSaveMsg = Save_Options() ? 1 : 0;
+        EA = 1;
+        if (!ShowSaveMsg)
+            ShowCancelMsg = 1;   /* 保存失败也用提示区显示 */
+        OptionChanged = 0;
         CalPage = 0;
-        OptionChanged = 1;      /* 退出设置时写 EEPROM */
         ClearDisplay = 1;
         DisplayUpdate = 1;
         ADCInterrupt = 1;
@@ -177,3 +211,20 @@ static void Key_Single(void)
     IE1 = 0;
 }
 
+/* 设置页里连按两下: 放弃修改, 从 EEPROM 重新读取(参数 + 校准表) */
+static void Key_DoubleSettings(void)
+{
+    if (!InSettings)
+        return;
+
+    Read_Options();
+    OptionChanged = 0;
+    SettingsDirty = 1;
+    CalPage = 0;
+    InfoPage = 0;
+    CursorPage = 0;
+    ShowCancelMsg = 1;
+    ClearDisplay = 1;
+    DisplayUpdate = 1;
+    ADCInterrupt = 1;
+}

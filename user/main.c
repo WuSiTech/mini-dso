@@ -286,6 +286,18 @@ void runWhenInSettrings()
 
         /* 更新参数
            Update parameters */
+        if (ShowSaveMsg || ShowCancelMsg)
+        {
+            uint8 st = ShowSaveMsg ? 1 : 2;
+            ShowSaveMsg = 0;
+            ShowCancelMsg = 0;
+            PlotSaveStatus(st);
+            OLED_Display();
+            Delay1000ms();
+            ClearDisplay = 1;
+            DisplayUpdate = 1;
+        }
+
         if (DisplayUpdate)
         {
             DisplayUpdate = 0;
@@ -310,7 +322,7 @@ void runWhenInSettrings()
         ClearDisplay = 0;
         /* 保存设置并显示保存状态
            Save settings and display saving status*/
-        PlotSaveStatus(Save_Options());
+        PlotSaveStatus(Save_Options() ? 1 : 0);
         OLED_Display();
         Delay1000ms();
     }

@@ -19,7 +19,7 @@
 
 void PlotChart(void);
 void PlotSettings(void);
-void PlotSaveStatus(bit _saveStatus);
+void PlotSaveStatus(uint8 _st);
 void GetWaveData(void);
 bit GetTriggerPos(uint16 d1, uint16 d2, uint16 dTrigger, bit triSlope);
 //cpv uint16 Convert_mv_ADC(uint16 mv, uint16 *BGV, uint16 BGADC, uint16 lsb);

@@ -1280,23 +1280,47 @@ void PlotInfoPage(void)
 
 /* 绘制保存状态
    Draw saving status*/
-void PlotSaveStatus(bit _saveStatus)
+void PlotSaveStatus(uint8 _st)
 {
     OLED_Overlap(0);
     OLED_ClearRow(50);
     OLED_ClearRow(56);
-    if (Lang)
+    if (_st == 2)                 /* 已取消修改 */
     {
-        OLED_DrawCNStr(16, 50, _saveStatus ? S_SaveOk : S_SaveFail);
+        if (Lang)
+            OLED_DrawCNStr(16, 50, S_Cancel);
+        else
+        {
+            OLED_Set_Pos(0, 56);
+            OLED_DrawString("Changes discarded");
+            OLED_InvertRect(0, 56, WIDTH);
+        }
     }
-    else
+    else if (_st == 1)            /* 保存成功 */
     {
-        OLED_Set_Pos(0, 56);
-        OLED_DrawString(_saveStatus ? "Save Success" : "Save Failed");
-        OLED_InvertRect(0, 56, WIDTH);
+        if (Lang)
+            OLED_DrawCNStr(16, 50, S_SaveOk);
+        else
+        {
+            OLED_Set_Pos(0, 56);
+            OLED_DrawString("Save Success");
+            OLED_InvertRect(0, 56, WIDTH);
+        }
+    }
+    else                          /* 保存失败 */
+    {
+        if (Lang)
+            OLED_DrawCNStr(16, 50, S_SaveFail);
+        else
+        {
+            OLED_Set_Pos(0, 56);
+            OLED_DrawString("Save Failed");
+            OLED_InvertRect(0, 56, WIDTH);
+        }
     }
     OLED_Overlap(1);
 }
+
 
 /* 光标测量叠加层: 两条竖线 + 底部一行显示 dT / dV */
 void PlotCursors(void)

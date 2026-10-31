@@ -53,6 +53,8 @@ bit InfoPage = 0;
 bit CursorPage = 0;
 __xdata uint8 CurA = 40, CurB = 110;
 bit CalPage = 0;
+bit ShowSaveMsg = 0;
+bit ShowCancelMsg = 0;
 uint8 CalSel = 0;
 bit CurSel = 0;
 bit EepromValid = 0;

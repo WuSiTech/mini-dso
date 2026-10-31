@@ -186,33 +186,7 @@ static void Key_Long(void)
 /* 单击: 主界面 暂停/继续; 光标页 -> 返回设置 */
 static void Key_Single(void)
 {
-    /* 设置内的子页面: 短按 = 返回设置列表 */
-    if (CursorPage)
-    {
-        CursorPage = 0;
-        ClearDisplay = 1;
-        DisplayUpdate = 1;
-        ADCInterrupt = 1;
-        return;
-    }
-    if (CalPage)
-    {
-        CalPage = 0;
-        OptionChanged = 1;
-        ClearDisplay = 1;
-        DisplayUpdate = 1;
-        ADCInterrupt = 1;
-        return;
-    }
-    if (InfoPage)
-    {
-        InfoPage = 0;
-        ClearDisplay = 1;
-        DisplayUpdate = 1;
-        ADCInterrupt = 1;
-        return;
-    }
-
+    /* 设置里(含光标/信息/校准表子页)短按不做任何事, 只用长按返回 */
     if (InSettings)
         return;
 

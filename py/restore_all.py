@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """烧录后一键恢复 EEPROM 校准数据: 时基校准表(0x16) + DtTbl(0x22) + 保存(0x11)。
 数据来源: 内置当前实测 CalTable; DtTbl 优先用 build/dtcal.json, 否则用内置实测值。
-用法: python py/restore_all.py
+用法: python py/restore_all.py [COM5]
 """
 import json
 import os
@@ -12,6 +12,8 @@ import time
 sys.path.insert(0, "py")
 import dso_gui as g  # noqa: E402
 import serial  # noqa: E402
+
+PORT = sys.argv[1] if len(sys.argv) > 1 else "COM5"
 
 CAL = [15242, 9203, 6047, 4596, 3045, 1513, 896, 594, 436, 288,
        129, 72, 43, 32, 17, 20, 2, 6, 1, 1, 0]
@@ -28,7 +30,7 @@ if os.path.exists(jsonf):
     except Exception as exc:
         print("读 dtcal.json 失败, 用内置值:", exc)
 
-ser = serial.Serial("COM5", 115200, timeout=0.2)
+ser = serial.Serial(PORT, 115200, timeout=0.2)
 p = g.FrameParser()
 
 

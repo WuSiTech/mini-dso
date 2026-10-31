@@ -811,8 +811,9 @@ void PWM_Isr(void) __interrupt (TIMER_1)
 {
   static __data uint8 SineIdx = 0;
   static __data uint8 PwmCnt = 0;    /* software PWM counter (0..31) */
-  static __data uint8 PwmVal = 128;   /* 8-bit waveform value */
-  static __data uint8 Dither = 0;     /* 0..15 dither for 8-bit duty */
+  static __data uint8 PwmVal = 128;   /* target 8-bit level */
+  static __data uint16 Acc = 0;       /* PDM accumulator */
+  bit PdmBit = 0;
   static uint16 TestCnt = 0;
   static uint8 GenPreCnt = 0;
   static uint16 GenCnt = 0;
@@ -828,10 +829,10 @@ void PWM_Isr(void) __interrupt (TIMER_1)
     return;
   }
 
-  /* P1.0 software PWM: 16-tick carrier (72.1kHz/16 = 4.5kHz), one table
-     entry per carrier period (64 entries -> about 70Hz), and the +Dither
-     trick dithers the 4-bit duty over 16 periods so the filtered output is
-     an 8-bit-resolution wave instead of a staircase */
+  /* P1.0 waveform out: 1-bit pulse-density modulation at the ISR rate
+     (72.1kHz) with a 64-entry table stepped every 16 ticks (~70Hz).
+     The on-board RP1 + L1 + C3 network averages the PDM stream, which is
+     much smoother than a low-resolution PWM and immune to ISR jitter. */
   if (++PwmCnt >= 16)
   {
     PwmCnt = 0;
@@ -843,10 +844,16 @@ void PWM_Isr(void) __interrupt (TIMER_1)
       PwmVal = SineTab[SineIdx];
     if (++SineIdx >= 64)
       SineIdx = 0;
-    if (++Dither >= 16)
-      Dither = 0;
   }
-  P10 = (OutSIN && (PwmCnt < (uint8)((PwmVal + Dither) >> 4))) ? 1 : 0;
+  Acc += PwmVal;
+  if (Acc >= 256)
+  {
+    Acc -= 256;
+    PdmBit = 1;
+  }
+  else
+    PdmBit = 0;
+  P10 = (OutSIN && PdmBit) ? 1 : 0;
 
   if (OutPWM)
   {

@@ -255,23 +255,24 @@ void getWaveFreq()
     den = (uint32)wsum * dt100;
     WaveFreq = (uint32)(((uint32)100000000UL * (uint32)wnum) / den);
 
-    /* robust frequency estimate: count crossings of the trigger level over the
-       whole buffer, then divide by the calibrated sample interval */
+    /* 频率读数(2): 在整段缓冲区里数触发沿方向的穿越点, 用实测采样间隔换算
+       样本和电平都用 uint16: ADCbuf 本身就是 12 位 uint16, 不做 uint8 截断;
+       只数单方向沿(由 TriSlope 决定上升/下降), 所以 (n-1) 就是完整周期数 */
     {
         uint16 idx2, first = 0, last = 0;
         uint8 n = 0;
-        uint8 lvl = (uint8)TriLevel;
+        uint16 lvl = TriggerADC;
 
         for (idx2 = 1; idx2 < SAMPLE_NUM; idx2++)
         {
-            uint8 a = *(ADCbuf + idx2 - 1);
-            uint8 b2 = *(ADCbuf + idx2);
+            uint16 a = *(ADCbuf + idx2 - 1);
+            uint16 b2 = *(ADCbuf + idx2);
             uint8 hit;
 
             if (TriSlope)
-                hit = (a <= lvl && b2 > lvl) ? 1 : 0;
+                hit = (a <= lvl && b2 > lvl) ? 1 : 0;   /* 上升沿 */
             else
-                hit = (a >= lvl && b2 < lvl) ? 1 : 0;
+                hit = (a >= lvl && b2 < lvl) ? 1 : 0;   /* 下降沿 */
 
             if (hit)
             {
@@ -282,9 +283,33 @@ void getWaveFreq()
             }
         }
         if (n >= 2 && last > first && DtTbl[ScaleH] > 0)
-            /* hits count both edges -> (n-1) is half-periods */
-            WaveFreq = (float)(((uint32)(n - 1) * 50000000UL)
-                               / ((uint32)(last - first) * DtTbl[ScaleH]));
+        {
+            /* f = (n-1) * 1e8 / (span_samples * DtTbl[档])
+               8051 没有 64 位库: 把 1e8 拆成 390625*256, 用 32 位长除法算
+               (n-1)*390625<<8, 既精确又不会溢出 */
+            uint32 den = (uint32)(last - first) * DtTbl[ScaleH];
+            uint32 x = (uint32)(n - 1) * 390625UL;   /* = (n-1)*1e8/256, 最大约 2^27 */
+            uint32 rem = 0, q = 0;
+            int8 b;
+
+            for (b = 34; b >= 0; b--)
+            {
+                rem <<= 1;
+                if (b >= 8)
+                    rem |= (x >> (b - 8)) & 1UL;
+                q <<= 1;
+                if (rem >= den)
+                {
+                    rem -= den;
+                    q |= 1UL;
+                }
+            }
+            WaveFreq = q;
+        }
+        else
+        {
+            WaveFreq = 0;   /* 穿越点不足: 没有可信读数, 屏幕显示 --- */
+        }
     }
 }
 
@@ -351,11 +376,10 @@ uint8 *c_WaveFreq_Str()
     static uint8 s[5];
     if (WaveFreq == 0)
     {
-        s[0] = '*';
-        s[1] = '*';
-        s[2] = '*';
-        s[3] = '*';
-        s[4] = '\0';
+        s[0] = '-';
+        s[1] = '-';
+        s[2] = '-';
+        s[3] = '\0';
     }
     else if (WaveFreq >= 10000000)
     {

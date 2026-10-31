@@ -147,20 +147,26 @@ WaveFreq   = 1e8 * wnum / (wsum * dt100)  // Hz
 
 **(2) 触发沿计数法（有效时覆盖上式）**
 
-在 220 点缓冲区里统计越过触发电平（`TriLevel` 对应的 ADC 电平）的边沿：
+整段 220 点缓冲区里**只数同一个方向**的穿越点（`TriSlope = 1` 数上升沿，否则数下降沿）。
+样本和电平都用 `uint16`：`ADCbuf` 本身就是 12 位 uint16，`lvl = TriggerADC`（mV 触发值换算
+成的 ADC 码），全程不做任何 `uint8` 截断：
 
 ```
-n     = 穿越次数
+n     = 单方向穿越次数
 first = 第一次穿越的样点下标
 last  = 最后一次穿越的样点下标
+span  = last - first                        // 样点数
 
-f = (n - 1) * 50000000 / ((last - first) * DtTbl[ScaleH])    // Hz
+f = (n - 1) * 1e8 / (span * DtTbl[ScaleH])  // Hz
 ```
 
-- **0.5 系数**：按上下沿都计数，`(n-1)` 是半周期数，除以 2 得到整周期数，因此分子是 `5e7`
-  而不是 `1e8`。
-- 条件：`n >= 2` 且 `last > first`；不满足时保留周期平均法的结果。
-- 显示：`c_WaveFreq_Str()` 格式化为 4 个字符（Hz / kHz / MHz），无有效读数显示 `****Hz`。
+- 只数单方向沿，所以 `(n-1)` 就是**完整周期数**，系数是 `1e8`（`DtTbl` 单位 0.01 µs）。
+- **门槛保护**：`n < 2`（缓冲区内不足两个同方向穿越点）时不计算、不显示垃圾值，
+  `WaveFreq = 0`，屏幕显示 `---Hz`。快档（80~200 µs/div）对低频信号正是这种情况，
+  这是采样窗口的分辨率极限，不靠再调系数去"修"。
+- **32 位长除法**：`(n-1)×1e8` 最大约 2.18e10，超出 uint32（8051 没有 64 位库），
+  固件把 `1e8` 拆成 `390625 × 256`，用 32 位长除法精确计算，既不会溢出也不会丢精度。
+- 显示：`c_WaveFreq_Str()` 格式化为 4 个字符（Hz / kHz / MHz），无有效读数显示 `---Hz`。
 
 #### D. 方波发生器（P1.1）
 
@@ -569,7 +575,8 @@ mini-dso/
 - 最快的 80 µs/div 档只在自动触发模式下可用（单次/普通触发的中间计算来不及）
 - 快档 #15~#20 的采样间隔受 ADC 转换开销限制（100 µs/div 档约 8.9 µs/点、150 µs/div 档约 6.6 µs/点）；
   频率读数已按 DtTbl 修正，但**屏幕时基标签与真实时间轴仍有偏差**
-- 频率读数使用触发沿计数法（周期平均法作初值/兜底），整数样点与电平量化仍会带来少量残差
+- 频率读数使用触发沿计数法（只数单方向沿，`1e8` 系数），整数样点与电平量化仍会带来少量残差；
+  快档（80~200 µs/div）对低频信号同方向穿越点不足 2 个时显示 `---Hz`，这是采样窗口的分辨率极限
 - 方波 / 波形频率由标定系数 TK 和每档偏移（EEPROM）决定，标称值近似；
   TK 默认 120（12.0 µs/tick），当前标定 117
 - BGV 实测约 1185 mV；ROM 校准字无效时回退 1200 mV
@@ -742,20 +749,30 @@ WaveFreq   = 1e8 * wnum / (wsum * dt100)  // Hz
 
 **(2) Crossing estimator (overrides when valid)**
 
-Over the 220-sample buffer, count crossings of the trigger level (`TriLevel`, as an ADC level):
+Over the whole 220-sample buffer, count crossings in **one direction only** (`TriSlope = 1` counts
+rising edges, otherwise falling edges). Samples and level are `uint16`: `ADCbuf` already holds
+12-bit codes and `lvl = TriggerADC` (the trigger level converted to ADC codes) — no `uint8`
+truncation anywhere:
 
 ```
-n     = number of crossings
+n     = number of same-direction crossings
 first = index of the first crossing
 last  = index of the last crossing
+span  = last - first                        // samples
 
-f = (n - 1) * 50000000 / ((last - first) * DtTbl[ScaleH])    // Hz
+f = (n - 1) * 1e8 / (span * DtTbl[ScaleH])  // Hz
 ```
 
-- **The 0.5 factor**: both edges are counted, so `(n-1)` is the number of half-periods; dividing
-  by 2 gives whole periods, hence `5e7` instead of `1e8`.
-- Valid when `n >= 2` and `last > first`; otherwise the period-average value is kept.
-- Display: `c_WaveFreq_Str()` formats 4 characters (Hz / kHz / MHz); no reading shows `****Hz`.
+- One direction only, so `(n-1)` is the number of **whole periods** and the factor is `1e8`
+  (`DtTbl` is in 0.01 µs).
+- **Guard**: when `n < 2` (fewer than two same-direction crossings in the buffer) nothing is
+  computed, `WaveFreq = 0` and the display shows `---Hz` instead of a garbage value. On the fast
+  ranges (80–200 µs/div) with a low-frequency signal this is expected — it is the resolution
+  limit of the sample window and must not be "fixed" by tweaking the coefficient.
+- **32-bit long division**: `(n-1)×1e8` can reach ≈2.18e10, which overflows uint32 (the 8051
+  toolchain has no 64-bit library). The firmware splits `1e8 = 390625 × 256` and performs exact
+  32-bit long division, so there is no overflow and no precision loss.
+- Display: `c_WaveFreq_Str()` formats 4 characters (Hz / kHz / MHz); no reading shows `---Hz`.
 
 #### D. Square-wave generator (P1.1)
 
@@ -1156,8 +1173,10 @@ mini-dso/
 - Fast bands #15~#20 are limited by ADC conversion overhead (100 µs/div ≈ 8.9 µs/point,
   150 µs/div ≈ 6.6 µs/point); frequency readout is corrected by DtTbl, but **screen time-base labels
   still differ from the real time axis**
-- Frequency readout uses the trigger-edge crossing estimator (period averaging as initial/fallback);
-  integer sample positions and level quantization still leave a small residual
+- Frequency readout uses the trigger-edge crossing estimator (single-direction edges, `1e8`
+  factor); integer sample positions and level quantization still leave a small residual.
+  On the fast ranges (80–200 µs/div) a low-frequency signal with fewer than two same-direction
+  crossings shows `---Hz` — that is the resolution limit of the sample window
 - Square/wave frequencies derive from the calibrated TK and per-band offsets (EEPROM) and are approximate;
   TK defaults to 120 (12.0 µs/tick), currently calibrated to 117
 - BGV measured ≈1185 mV; falls back to 1200 mV when the ROM calibration word is invalid

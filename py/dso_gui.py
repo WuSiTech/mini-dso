@@ -571,30 +571,60 @@ class App:
         self.info.pack(fill="x")
 
         # ---- 按钮网格 (3 列 x 3 行, 单独一个 Frame 用 grid) ----
-        bgrid = tk.Frame(bot)
-        bgrid.pack(fill="x", pady=(2, 0))
-        for c in range(3):
-            bgrid.columnconfigure(c, weight=1, uniform="btn")
-        self.btn_pause = tk.Button(bgrid, text="暂停", command=self._toggle_pause)
-        self.btn_pause.grid(row=0, column=0, padx=2, pady=2, sticky="ew")
-        tk.Button(bgrid, text="读取", command=self._read_all).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
-        tk.Button(bgrid, text="保存设置", command=self._save).grid(row=0, column=2, padx=2, pady=2, sticky="ew")
-        tk.Button(bgrid, text="保存波形 (CSV)", command=self._save_wave).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
-        tk.Button(bgrid, text="保存截图 (PNG)", command=self._save_shot).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
-        self.btn_view = tk.Button(bgrid, text="频谱", command=self._toggle_view)
-        self.btn_view.grid(row=1, column=2, padx=2, pady=2, sticky="ew")
-        self.btn_lang = tk.Button(bgrid, text="English", command=self._toggle_lang)
-        self.btn_lang.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
-        self.btn_cur = tk.Button(bgrid, text="光标", command=self._toggle_cursors)
-        self.btn_cur.grid(row=2, column=1, padx=2, pady=2, sticky="ew")
-        self.btn_outcal = tk.Button(bgrid, text="输出波偏移", command=self._open_outcal)
-        self.btn_tbcal = tk.Button(bgrid, text="声卡校时基", command=self._audio_tb_calibrate)
-        self.btn_tbcal.grid(row=4, column=0, columnspan=3, padx=2, pady=2, sticky="ew")
-        self.btn_outcal.grid(row=3, column=0, columnspan=3, padx=2, pady=2, sticky="ew")
-        self.btn_cal = tk.Button(bgrid, text="时基校准", command=self._calibrate)
-        self.btn_cal.grid(row=2, column=2, padx=2, pady=2, sticky="ew")
+        # ---- 按钮区: 按功能分组, 校准类做成"两级" ----
+        def srow(text):
+            f = tk.Frame(bot)
+            f.pack(fill="x", pady=(4, 0))
+            tk.Label(f, text=text, anchor="w", fg="#555",
+                     font=("Segoe UI", 8, "bold")).pack(side="top", anchor="w", padx=4)
+            g = tk.Frame(f)
+            g.pack(fill="x")
+            return g
 
-        # ---- 上部参数区(可滚动) ----
+        def btns(parent, specs):
+            for i, (txt, cb) in enumerate(specs):
+                parent.columnconfigure(i, weight=1, uniform="b%d" % i)
+                tk.Button(parent, text=txt, command=cb).grid(
+                    row=0, column=i, padx=2, pady=1, sticky="ew")
+
+        f = srow("运行")
+        self.btn_pause = tk.Button(f, text="暂停", command=self._toggle_pause)
+        self.btn_pause.pack(fill="x", padx=2, pady=1)
+
+        f = srow("参数")
+        btns(f, [("读取", self._read_all), ("保存设置", self._save)])
+
+        f = srow("导出")
+        btns(f, [("保存波形 CSV", self._save_wave), ("保存截图 PNG", self._save_shot)])
+
+        f = srow("视图 / 界面")
+        self.btn_view = tk.Button(f, text="频谱", command=self._toggle_view)
+        self.btn_view.grid(row=0, column=0, padx=2, pady=1, sticky="ew")
+        self.btn_cur = tk.Button(f, text="光标", command=self._toggle_cursors)
+        self.btn_cur.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
+        self.btn_lang = tk.Button(f, text="English", command=self._toggle_lang)
+        self.btn_lang.grid(row=0, column=2, padx=2, pady=1, sticky="ew")
+        for i in range(3):
+            f.columnconfigure(i, weight=1, uniform="vw")
+
+        f = srow("校准 · 设备自校")
+        self.btn_cal = tk.Button(f, text="时基自校", command=self._calibrate)
+        self.btn_cal.grid(row=0, column=0, padx=2, pady=1, sticky="ew")
+        self.btn_outcal = tk.Button(f, text="输出波偏移表", command=self._open_outcal)
+        self.btn_outcal.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
+        for i in range(2):
+            f.columnconfigure(i, weight=1, uniform="cal")
+
+        f = srow("校准 · 声卡绝对基准 (需接线)")
+        self.btn_tbcal = tk.Button(f, text="校时基", command=self._audio_tb_calibrate)
+        self.btn_tbcal.grid(row=0, column=0, padx=2, pady=1, sticky="ew")
+        self.btn_sqcal = tk.Button(f, text="校方波输出", command=lambda: self._audio_out_cal("sq"))
+        self.btn_sqcal.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
+        self.btn_wvcal = tk.Button(f, text="校波形输出", command=lambda: self._audio_out_cal("wv"))
+        self.btn_wvcal.grid(row=0, column=2, padx=2, pady=1, sticky="ew")
+        for i in range(3):
+            f.columnconfigure(i, weight=1, uniform="aud")
+
         wrap = tk.Frame(right)
         wrap.pack(side="top", fill="both", expand=True)
         scr = tk.Scrollbar(wrap, orient="vertical")
@@ -1270,6 +1300,10 @@ class App:
         threading.Thread(target=worker, daemon=True).start()
 
     # ---------------- 声卡当标准信号源, 校准时基(绝对) ----------------
+    def _audio_out_cal(self, group):
+        """声卡测频校准输出波(方波/波形), 等价于对话框里的两个按钮"""
+        self._audio_calibrate(group)
+
     def _audio_tb_calibrate(self):
         if not (self.link and not self.demo):
             self._msg("请先连接设备")

@@ -1,15 +1,38 @@
-# Mini-DSO v1.2 — STC8A8K64D4 @ 45 MHz 移植与增强版
+# Mini-DSO v1.2 — STC8A8K64D4 @ 45 MHz
 
-把 [CreativeLau/Mini-DSO](https://github.com/CreativeLau/Mini-DSO) v0.3 移植到
-**56dz.com 的 STC8A8K64D4 核心板**（45 MHz 内部 IRC），并在原版基础上加了
-中英双语界面、可调信号源、串口数据流 + 电脑上位机、EEPROM 时基校准、双光标测量等功能。
-
-- 原作者：Creative Lau（硬件设计 / 原始固件）
-- 45 MHz 移植与增强：WuSi & DeepSeek
+**中文** | [English](#english-version)
 
 ---
 
-## 1. 硬件
+## 中文版
+
+### 简介
+
+把 [CreativeLau/Mini-DSO](https://github.com/CreativeLau/Mini-DSO) v0.3 移植到
+**56DZ 版 STC8A8K64D4 核心板**（45 MHz 内部 IRC、SSD1306 128×64 SPI OLED、EC11 旋钮），
+并在此基础上做了进一步开发。
+
+### 特色
+
+- **中英双语界面**：设置页/信息页/启动页一键切换中文 ⇄ English，语言存 EEPROM
+- **可以使用电脑作为上位机**：`py/dso_gui.py` 提供实时波形、FFT、自动测量、双光标、
+  时基一键校准、参数读写、EEPROM 保存、波形 CSV / 截图 PNG 导出；
+  无硬件时可用 `--demo` 演示。**软件就在仓库的 `py/` 目录**
+- **21 档时基** 500 ms/div … 80 µs/div，逐档实测校准（EEPROM 可软件再校准）
+- **双光标测量**：设备端独立光标页，直接读出 `dT` / `dV`（画在最底行）
+- **可调信号源**：P1.1 方波 15 档频率（≈1 Hz~42 kHz）+ 占空比 1~99 %；
+  P1.0 可输出正弦 / 三角 / 锯齿（经外部 RC）
+- **中文点阵字库**：12×12 像素风，由 `py/gen_cnfont.py` 自动生成
+- **串口协议完整**：采样流 + 参数读写 + EEPROM 保存 + 时基校准表 + 固件版本查询
+- 开机启动页 + 自检（EEPROM / 校准表 / 电池电压），烧录可软复位进 ISP
+
+### 来源与致谢
+
+- 原作：**CreativeLau** — https://github.com/CreativeLau/Mini-DSO
+- 适配到 56DZ 版：https://www.elektormagazine.de/labs/reverse-project-mini-oscilloscope
+- 进一步开发：**WuSi & DeepSeek** — https://github.com/WuSiTech/mini-dso
+
+### 硬件
 
 | 项目 | 说明 |
 |---|---|
@@ -17,181 +40,137 @@
 | 显示 | SSD1306 128×64 OLED，**SPI** 接法（GND VCC D0 D1 RES DC CS） |
 | 输入 | ADC CH0 = **P0.1**，ADC CH1 = **P1.4** |
 | 方波输出 | **P1.1**（推挽，频率 / 占空比可调） |
-| 波形输出 | **P1.0**（PCA 8-bit PWM + 外部 RC 低通，正弦/三角/锯齿） |
-| 旋钮 | EC11 编码器（Timer0 250 µs 正交采样，4 跳变/步） |
+| 波形输出 | **P1.0**（PCA 8-bit PWM + 外部 RC 低通） |
+| 旋钮 | EC11 编码器（Timer0 250 µs 正交采样） |
 | 串口 | P3.0 RXD / P3.1 TXD，**115200 8N1** |
 | 指示灯 | P2.6 |
-| 存储 | 内部 EEPROM 512 B（设置 + 时基校准表） |
+| 存储 | 内部 EEPROM 512 B（设置 + 校准表） |
 
-> 自测小技巧：把 P1.1 接到输入分压端，就能用示波器测自己的方波输出。
+### 快速上手
 
----
+1. 烧录 `build/minidso_uart.hex`（见下方"烧录"）
+2. 上电 → 启动页显示 LOGO 和自检结果 → 自动进主界面
+3. 把待测信号接到输入分压端（P0.1 通道）
+4. 旋转旋钮调时基/量程，按住旋钮再旋转可切换要调的项目
+5. 短按：暂停/继续；长按 0.5 秒：进设置
 
-## 2. 固件功能
+### 操作说明 — 设备
 
-### 采样与显示
-- **21 档时基**：500 ms/div … 80 µs/div（每档单独实测校准）
-- 触发：自动 / 正常 / 单次，上升沿 / 下降沿，触发电平可调
-- 垂直：自动量程 + 手动量程，分压系数 LSB 可调（默认 600）
-- 绘图：矢量 / 点阵两种模式
-- 测量：频率、最大/最小电压、电池电压
-- 暂停：短按即停，画面冻结在按下瞬间
+#### 主界面
 
-### 按键（EC11）
+屏幕布局：顶部状态行（`Run/Stop`、时基、触发电平、触发方式、频率），
+中间波形区（26~126 列），底部显示电压范围/时基。
 
-| 操作 | 行为 |
+| 操作 | 作用 |
 |---|---|
-| 短按（≥10 ms 防抖） | 主界面：**Run ⇄ Stop** 立即切换（已去掉双击） |
-| 按住 **≥500 ms** 不动 | 进入 / 退出设置 |
-| 按住 + 旋转 | 只调当前参数，**不会**跳设置 |
-| 旋转 | 主界面调速/量程/触发；设置页选项间移动 |
-| 滚动波形模式 | 已不在按键里，改由上位机参数设置 |
+| **旋转** | 调整当前选中项的值（时基 / 量程 / 触发电平 / 触发沿 / 触发方式） |
+| **按住 + 旋转** | 切换要调的项目（不会进入设置） |
+| **短按** | **Run ⇄ Stop** 立即切换，画面冻结在按下瞬间 |
+| **长按 ≥0.5 s** | 进入设置页 |
 
-### 设置页（13 项，长按进入）
+#### 设置页（13 项）
 
-中文 12×12 点阵、一屏 5 行；英文一屏 8 行。进入/退出都会整屏重绘。
+旋转 = 改当前项的值；**按住 + 旋转** = 在项目间移动；**长按** = 保存并退出。
 
 ```
-绘图模式   亮度      分压系数
-方波输出   方波频率   占空比
-波形输出   波形类型   串口输出
-语言       光标测量 >
+绘图模式      亮度        分压系数
+方波输出      方波频率    占空比
+波形输出      波形类型    串口输出
+语言          光标测量 >
 创作者信息 >  电池电压
 ```
 
-- **旋钮加速**：只有 4 个纯数值项（亮度 / 分压系数 / 方波频率 / 占空比）才加速：
-  慢转 1 步、≤120 ms 2 步、≤50 ms 3 步；其余项目全部 1 格 1 步
-- **语言**：中文 ⇄ English 即时切换，存 EEPROM
-- **光标测量**：选中后再旋转进入光标页
-- **创作者信息**：选中后再旋转进入版权页
+- **旋钮加速**：仅 4 个纯数值项（亮度 / 分压系数 / 方波频率 / 占空比）加速
+  （慢转 1 步、≤120 ms 2 步、≤50 ms 3 步）；其他项一律 1 格 1 步
+- **语言**：切换后立即生效并存 EEPROM
+- **方波频率**：15 档，`1Hz/2/5/10/20/50/100/200/500/1k/2k/5k/10k/17k/42k Hz`
+- **波形类型**：正弦 / 三角 / 锯齿（P1.0 输出，需外接 RC 才好看）
 
-### 光标测量页
+#### 光标测量页
 
-- 两条竖直光标（选中的实线、另一个虚线），限制在图表 100 列内
-- **长按旋转**切换 A/B，**直接旋转**左右移动；移动时整屏重绘，不留残影
-- **最底一行**显示 `dT:xxx us/ms` 和 `dV:x.xx V`（取代原来的电压范围/时基信息）
-- 长按或短按返回设置
+进入：设置页滚到「光标测量」，**再旋转一格**进入。
 
-### 创作者信息页
+| 操作 | 作用 |
+|---|---|
+| 旋转 | 左右移动当前光标（限制在图表 100 列内） |
+| 按住 + 旋转 | 切换选中 A / B（选中的是实线，另一个虚线） |
+| 短按 / 长按 | 返回设置页 |
 
-- Mini-DSO LOGO + 原作 / 开发 / 项目地址（可选中，旋转显示网址，超长自动轮播）
-- 底部 `<Back`，旋转即返回；长按直接退回设置
+屏幕**最底一行**显示 `dT:xxx us/ms  dV:x.xx V`（取代原来的电压范围/时基信息）。
 
-### 信号源
-- **方波（P1.1）**：15 档频率（约 1 Hz ~ 42 kHz）+ 占空比 1~99 %
-- **波形（P1.0）**：正弦 / 三角 / 锯齿，经外部 RC 得到模拟波形
-- 两个输出独立开关，关闭时引脚拉低到 0 V
-- 周期由单一常量 `GEN_TICK_US10`（120 = 12.0 µs/tick）实时算出，无写死的经验表
+#### 创作者信息页
 
-### 其它
-- 开机启动页：Mini-DSO LOGO + `C.L./W.S.&D.S`，底部自检行 `EEP:OK CAL:OK x.xxV`
-- 设置 / 校准表存 EEPROM；保存时显示 `保存成功 / 保存失败`
-- **不启用看门狗**：500 ms/档 一轮采样要 4.4 s，触发等待等状态软件无法与卡死区分，
-  启用会误复位，因此保持关闭（真卡死断电重启即可）
+进入：设置页滚到「创作者信息」，再旋转一格进入。
+页面显示 LOGO、原作、开发、项目地址；`按住 + 旋转` 选择条目，
+`旋转` 显示对应网址（长网址自动轮播），选到 `<Back` 旋转即返回；长按直接退回。
 
----
+#### 信号源
 
-## 3. 编译
+1. 设置页打开 `方波输出`（P1.1）和/或 `波形输出`（P1.0）
+2. 调 `方波频率`、`占空比`、`波形类型`
+3. 关闭时引脚被拉到 0 V
 
-需要 **SDCC 4.6.0**（`sdcc` / `sdar` / `sdranlib` 在 PATH 里）。
+### 操作说明 — 上位机（PC）
 
-**推荐用仓库脚本**：
+`py/dso_gui.py` 需要 Python 3 + `pyserial`（画 PNG 需要 `pillow`）：
+
+```bat
+pip install pyserial pillow
+python py\dso_gui.py            :: 连真机
+python py\dso_gui.py --demo     :: 无硬件演示
+python py\dso_gui.py --selftest :: 协议自检
+```
+
+**步骤**：
+
+1. 设备设置里确认 `串口输出 = ON`（默认开），USB 串口接电脑
+2. 打开软件 → 选端口 → 点「连接」（选不到端口就点「刷新」）
+3. 波形自动刷新；右侧参数面板改任何值**即时生效**（不等按钮）
+4. 点「保存到 EEPROM」把当前参数写进设备
+5. 点「读取」可随时把设备参数读回来
+6. 「一键校准」会驱动设备输出测试方波、自动测量 21 档时基并写回校准表
+
+**界面功能**：
+
+| 区域 / 按钮 | 说明 |
+|---|---|
+| 波形区 | 实时波形（矢量/点阵）；滚轮缩放、Ctrl+滚轮纵向、拖动平移 |
+| 测量 | Vpp / Vmax / Vmin / Vrms / Vavg / 频率 / 周期 / 占空比 / 上升时间 |
+| 光标 | Shift+左键放置、拖动、双击复位，显示 Δt / ΔV |
+| 参数面板 | 绘图模式、亮度(BRT)、LSB、时基、量程、触发电平/沿/方式、输出开关、方波频率、占空比、波形类型、设备语言 |
+| 频谱 | 切到 FFT 视图（128 点 Hann 窗） |
+| 暂停 | 停止刷新画面（串口继续收） |
+| 保存波形 (CSV) | 时间 / 原始 ADC / 电压(mV) |
+| 保存截图 (PNG) | 当前画面 |
+| 语言 | 上位机界面中英切换 |
+| 一键校准 | 自动校 21 档时基 |
+
+### 编译
+
+需要 **SDCC 4.6.0**（`sdcc`/`sdar`/`sdranlib` 在 PATH）。
 
 ```bat
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
-它会编译 `src/*.c` + `user/main.c`、打包库、链接，输出 `build/minidso_uart.hex`。
-
-> ⚠️ **必须带 `--stack-auto`**：8051 直接寻址 RAM 只有 128 B，不加这个参数会报
+> ⚠️ **必须带 `--stack-auto`**：8051 直接寻址 RAM 只有 128 B，不加会报
 > `Could not get ... consecutive bytes in internal RAM for area DSEG`。
 
-手工等价命令：
+资源占用（v1.2.0）：ROM 36,738 / 64,512 (57%)、XRAM 3,551 / 8,192、栈 218 B。
 
-```bat
-set FLAGS=-mmcs51 --model-large --opt-code-size --std-c23 --stack-auto
-for %f in (src\*.c) do sdcc %FLAGS% -Iinclude -c %f
-sdcc %FLAGS% -Iinclude -c user\main.c
-sdar -rcs minidso.lib *.rel
-sdranlib minidso.lib
-sdcc %FLAGS% --iram-size 256 --xram-size 8192 --code-size 64512 --out-fmt-ihx main.rel minidso.lib -o build\minidso_uart.hex
-```
+中文字库改了之后重新生成：`python py\gen_cnfont.py`（不要手改 `include/cnfont.h`）。
 
-当前固件占用（v1.2.0）：
+### 烧录
 
-| 资源 | 已用 / 总量 |
-|---|---|
-| ROM | 36,738 / 64,512 B（约 57 %） |
-| XRAM | 3,551 / 8,192 B |
-| 栈 | 218 B（链接器按静态调用深度算出） |
-| IRAM | 直接寻址 RAM 已满，新增全局变量请放 `__xdata` |
+- **STC-ISP**：芯片 STC8A8K64D4，IRC 45 MHz，打开 `build/minidso_uart.hex`，
+  点下载后**断电再上电**
+- **命令行**：`python -m stcgal -P stc8d -p COM5 build/minidso_uart.hex`（需冷启动）
+- **运行中自动烧录**：`python py\flash.py COM5 build\minidso_uart.hex`
+  （固件收到 `0x14` 后软复位进 ISP）
 
-### 中文字模
+> 烧录会整片擦除 EEPROM：设置和校准表回到默认值。
 
-`include/cnfont.h` 是**自动生成**的（12×12 字模 + 中文串表）。加字方法：
-编辑 `py/gen_cnfont.py` 的 `STRINGS`，然后
-
-```bat
-python py\gen_cnfont.py
-```
-
----
-
-## 4. 烧录
-
-### STC-ISP（图形界面）
-1. 芯片型号 **STC8A8K64D4**，IRC 选 **45 MHz**
-2. 打开 `build/minidso_uart.hex`
-3. 点"下载/编程"后给板子**断电再上电**
-
-### 命令行
-```bat
-python -m stcgal -P stc8d -p COM5 build/minidso_uart.hex
-```
-同样需要冷启动（stcgal 会提示 `Waiting for MCU, please cycle power`）。
-
-### 运行中自动烧录
-```bat
-python py\flash.py COM5 build\minidso_uart.hex
-```
-`py/flash.py` 先发 `0x14` 让固件软复位进 ISP，再调 stcgal，无需手动拔电。
-
-> ⚠️ 烧录会整片擦除 EEPROM：设置和校准表回到默认值（默认值已校准，可直接用）。
-
----
-
-## 5. 上位机（Python GUI）
-
-`py/dso_gui.py` — Tkinter 实时示波器界面：
-
-- 实时波形（矢量/点阵）、FFT 频谱
-- **测量**：Vpp / Vmax / Vmin / Vrms / Vavg / 频率 / 周期 / 占空比 / 上升时间
-- **光标**：Shift+左键放置、拖动、双击复位，显示 Δt / ΔV
-- 滚轮缩放、拖动平移、时基滑块、纵向缩放
-- 参数面板：时基/量程/触发/绘图模式/LSB/亮度/方波输出/波形输出/串口输出/语言等
-- **保存到 EEPROM**（固件真正写 EEPROM）
-- **一键时基校准**：读校准表 → 测 21 档实际间隔 → 写回
-- 保存波形 CSV / 截图 PNG、暂停/继续、中英文界面、`--demo`、`--selftest`
-
-### 安装 / 运行
-```bat
-pip install pyserial pillow
-python py\dso_gui.py                 :: 连真机
-python py\dso_gui.py --demo          :: 无硬件演示
-python py\dso_gui.py --selftest      :: 协议自检
-```
-串口 115200 8N1；示波器设置里 `串口输出` 必须 ON（默认 ON）。
-
-### 开发工具
-| 文件 | 作用 |
-|---|---|
-| `py/gen_cnfont.py` | 生成 `include/cnfont.h` |
-| `py/test_tb.py` | 自动测量 21 档时基误差 |
-| `py/flash.py` | 通过串口让 DSO 进 ISP 并自动烧录 |
-
----
-
-## 6. 串口协议
+### 串口协议
 
 ```
 A5 5A TYPE LENH LENL PAYLOAD[LEN] SUM
@@ -200,72 +179,160 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 
 | TYPE | 方向 | 含义 |
 |---|---|---|
-| `0x01` | DSO→PC | 采样帧：28 字节头 + N×uint16 原始 ADC（小端） |
-| `0x02` | DSO→PC | 应答：[0] 结果（0 成功 / 1 失败） |
-| `0x03` | DSO→PC | 参数块（22 字节） |
-| `0x10` | PC→DSO | 下发参数（立即生效，不写 EEPROM） |
-| `0x11` | PC→DSO | 保存参数到 EEPROM |
-| `0x12` | PC→DSO | 读取参数 |
-| `0x14` | PC→DSO | 软复位进 ISP（烧录用） |
-| `0x15` | PC→DSO | 输出测试方波（分频值） |
-| `0x16` | PC→DSO | 写时基校准表（21×uint16） |
-| `0x17` | PC→DSO | 读时基校准表 |
-| `0x19` | DSO→PC | 固件信息：版本 / 参数块长度 / 帧头长度 / 能力位 / tick |
+| 0x01 | DSO→PC | 采样帧（28 B 头 + N×uint16） |
+| 0x02 | DSO→PC | 应答 |
+| 0x03 | DSO→PC | 参数块（22 B） |
+| 0x10 | PC→DSO | 下发参数（立即生效） |
+| 0x11 | PC→DSO | 保存到 EEPROM |
+| 0x12 | PC→DSO | 读取参数 |
+| 0x14 | PC→DSO | 软复位进 ISP |
+| 0x15 | PC→DSO | 输出测试方波 |
+| 0x16 / 0x17 | PC→DSO | 写 / 读时基校准表（21×uint16） |
+| 0x19 | DSO→PC | 固件信息（版本/长度/能力/tick） |
 
-**采样帧头（28 B）**
+参数块（22 B）：`Lsb(u16) PlotMode ScaleH ScaleV_Auto RulerVMax(u16) RulerVMin(u16)
+TriLevel(u16) TriMode TriSlope WaveScroll Brightness OutPWM OutSIN OutUART
+GenFreqIdx GenDuty WaveType Lang`
 
-```
-flags(u8) ScaleH(u8) PlotMode(u8) TriMode(u8) TriSlope(u8) N(u8)
-VMax(u16) VMin(u16) WaveFreq(u32)
-RulerVMin(u16) RulerVMax(u16) PlotADCMin(u16) PlotADCMax(u16)
-BGV(u16) ADCbg(u16) LSB(u16)
-```
-`flags`：bit0 运行中、bit1 触发失败、bit2 自动量程
-
-**参数块（22 B，与 EEPROM 顺序一致）**
-
-```
-Lsb(u16) PlotMode(u8) ScaleH(u8) ScaleV_Auto(u8)
-RulerVMax(u16) RulerVMin(u16) TriLevel(u16)
-TriMode(u8) TriSlope(u8) WaveScroll(u8) Brightness(u8)
-OutPWM(u8) OutSIN(u8) OutUART(u8)
-GenFreqIdx(u8) GenDuty(u8) WaveType(u8) Lang(u8)
-```
-
----
-
-## 7. 目录结构
+### 目录结构
 
 ```
 mini-dso/
-├─ src/            固件源码（adc / chart / delay / eeprom / global / keys / settings / ssd1306 / uart）
+├─ src/            固件源码
 ├─ include/        头文件（cnfont.h 中文字模、bmp.h LOGO、keys.h …）
-├─ user/main.c     主程序、中断、主循环
-├─ build/
-│  ├─ minidso.hex          原版 hex（勿改）
-│  └─ minidso_uart.hex     当前固件 v1.2.0
-├─ py/             上位机与开发工具
+├─ user/main.c     主程序 + 中断 + 主循环
+├─ build/          minidso.hex（原版）/ minidso_uart.hex（当前 v1.2.0）
+├─ py/             上位机与工具（dso_gui.py / flash.py / test_tb.py / gen_cnfont.py）
 ├─ build.ps1       一键编译
 └─ README.md
 ```
 
+### 已知事项
+
+- 时基表按实测校准，绝对时间与外部基准可能有几个百分点偏差
+- 方波频率由 `GEN_TICK_US10 = 120`（12.0 µs/tick）推算，标称值近似
+- BGV 实测 1185 mV（代码回退 1200 mV）
+- IRAM 已满，新增全局变量请放 `__xdata`
+- 所有 C 源文件是 **GBK** 编码
+- 双击功能已移除（和"短按 Run/Stop"冲突）
+- 不启用看门狗：长时基采样一轮 4.4 s，软件无法与卡死区分，会误复位
+
+### 许可
+
+原始项目 MIT（见 `src/` 文件头）；本移植与增强同样以 MIT 发布。
+
 ---
 
-## 8. 已知事项
+## English version
 
-- **时基**：21 档延时表按实测校准（`src/adc_stc8.c` 的 `DefaultDelayTable`），
-  EEPROM 里另存一份可软件校准的 `CalTable`；绝对时间与外部基准可能有几个百分点偏差。
-- **方波频率**：由 `GEN_TICK_US10 = 120`（12.0 µs/tick）推算，标称频率是近似值。
-- **电池电压**：芯片 BGV 实测 1185 mV，代码失效回退 1200 mV。
-- **RAM 紧张**：IRAM 已满、XRAM 用掉约 43 %、栈 218 B；新增全局变量请放 `__xdata`。
-- **烧录会擦 EEPROM**（设置 + 校准表）。
-- 所有 C 源文件为 **GBK** 编码，用 UTF-8 编辑器打开中文注释会乱码。
-- `include/cnfont.h` 是生成文件，改 `py/gen_cnfont.py` 后重新生成，不要手改。
-- 双击功能已移除（与"短按 Run/Stop"冲突）。
+### What it is
 
----
+Port of [CreativeLau/Mini-DSO](https://github.com/CreativeLau/Mini-DSO) v0.3 to the
+**56DZ STC8A8K64D4 board** (45 MHz internal IRC, SSD1306 128×64 SPI OLED, EC11 encoder),
+plus further development.
 
-## 9. 许可
+### Features
 
-原始项目采用 MIT License（见 `src/` 各文件头部版权声明）。
-本移植与增强部分同样以 MIT 发布，欢迎自由使用 / 修改。
+- **Bilingual UI** (Chinese ⇄ English), language stored in EEPROM
+- **PC host software included**: `py/dso_gui.py` gives live waveform, FFT, automatic
+  measurements, dual cursors, one-click time-base calibration, parameter read/write,
+  EEPROM save, CSV/PNG export, `--demo` mode without hardware
+- **21 time-base ranges** (500 ms/div … 80 µs/div), individually calibrated
+- **On-device dual-cursor page** showing `dT` / `dV` on the bottom line
+- **Signal generator**: P1.1 square wave, 15 frequencies (≈1 Hz–42 kHz), duty 1–99 %;
+  P1.0 sine / triangle / sawtooth (needs RC filter)
+- 12×12 pixel Chinese font, generated by `py/gen_cnfont.py`
+- Full UART protocol: sample stream, settings R/W, EEPROM save, calibration table, version query
+
+### Credits
+
+- Original: **CreativeLau** — https://github.com/CreativeLau/Mini-DSO
+- 56DZ adaptation: https://www.elektormagazine.de/labs/reverse-project-mini-oscilloscope
+- Further development: **WuSi & DeepSeek** — https://github.com/WuSiTech/mini-dso
+
+### Controls (device)
+
+| Action | Function |
+|---|---|
+| Rotate | Adjust the currently selected item (time base / range / trigger level / slope / trigger mode) |
+| Press + rotate | Select which item to adjust (does not enter settings) |
+| Short press | Run ⇄ Stop immediately |
+| Long press (≥0.5 s) | Enter / exit settings |
+
+Settings page: rotate = change value, **press+rotate = move between items**,
+long press = save and exit. 13 items:
+`Plot mode, Brightness, LSB, PWM out, PWM freq, Duty, Wave out, Wave type, UART out,
+Language, Cursor >, Dev-er Info >, Batt voltage`.
+Encoder acceleration applies only to the four numeric items (brightness, LSB,
+PWM frequency, duty): 1 step slow, 2 steps ≤120 ms, 3 steps ≤50 ms.
+
+Cursor page: enter from settings (select “Cursor”, rotate once more).
+Rotate = move cursor, press+rotate = switch A/B, short/long press = back.
+`dT` / `dV` are shown in the bottom line.
+
+Creator info page: select “Dev-er Info” then rotate to open; press+rotate selects
+Original / Developer / Project URL / `<Back`; rotate shows the corresponding URL
+(marquee for long URLs); long press returns.
+
+### Controls (PC host, `py/dso_gui.py`)
+
+```bat
+pip install pyserial pillow
+python py\dso_gui.py            :: real device
+python py\dso_gui.py --demo     :: demo without hardware
+python py\dso_gui.py --selftest :: protocol self-test
+```
+
+1. Set `UART out = ON` on the device and connect its USB serial port
+2. Choose the port and press “Connect”
+3. Parameter changes on the right panel are applied immediately
+4. “Save to EEPROM” writes them to the device; “Read” fetches them back
+5. “One-click calibrate” measures all 21 time bases and writes the calibration table
+
+Waveform view: mouse wheel = zoom, Ctrl+wheel = vertical, drag = pan.
+Measurements: Vpp/Vmax/Vmin/Vrms/Vavg/frequency/period/duty/rise time.
+Cursors: Shift+click to place, drag to move, double-click to reset (Δt/ΔV).
+Also: FFT view, pause, CSV/PNG export, UI language switch.
+
+### Build
+
+SDCC 4.6.0 required:
+
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
+```
+
+`--stack-auto` is mandatory (only 128 B of directly addressable IRAM).
+Current usage: ROM 36,738 / 64,512 B, XRAM 3,551 / 8,192 B, stack 218 B.
+
+### Flash
+
+- STC-ISP: chip STC8A8K64D4, IRC 45 MHz, `build/minidso_uart.hex`, power-cycle to download
+- `python -m stcgal -P stc8d -p COM5 build/minidso_uart.hex`
+- `python py\flash.py COM5 build\minidso_uart.hex` (firmware jumps to ISP by itself)
+
+Flashing erases the whole EEPROM (settings and calibration table).
+
+### Protocol
+
+```
+A5 5A TYPE LENH LENL PAYLOAD[LEN] SUM
+SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
+```
+
+`0x01` sample frame (28 B header + N×uint16), `0x02` ACK, `0x03` settings block (22 B),
+`0x10` set, `0x11` save, `0x12` get, `0x14` reboot to ISP, `0x15` test square,
+`0x16`/`0x17` write/read calibration table, `0x19` firmware info.
+
+### Known issues
+
+- Time-base is calibrated against the device itself; absolute accuracy may be off by a few percent
+- Square-wave frequencies derive from `GEN_TICK_US10 = 120` (12.0 µs/tick) and are approximate
+- IRAM is full — put new globals in `__xdata`
+- C sources are **GBK** encoded
+- Double-click was removed (conflicts with single-press Run/Stop)
+- Watchdog intentionally disabled (long sweeps look like a hang)
+
+### License
+
+MIT, as the original project.

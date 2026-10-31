@@ -63,6 +63,12 @@ SCALE_H_SEC = [0.5, 0.3, 0.2, 0.15, 0.1, 0.05, 0.03, 0.02, 0.015, 0.01,
 TRI_MODE_TXT = ["Auto", "Normal", "Single"]
 PLOT_MODE_TXT = ["Dots", "Vect"]
 
+# v1.2 新增: 信号源 15 档频率 / 波形类型 / 语言
+GEN_FREQ_TXT = ["1Hz", "2Hz", "5Hz", "10Hz", "20Hz", "50Hz", "100Hz",
+                "200Hz", "500Hz", "1kHz", "2kHz", "5kHz", "10kHz", "17kHz", "42kHz"]
+WAVE_TYPE_TXT = ["正弦 Sine", "三角 Tri", "锯齿 Saw"]
+LANG_TXT = ["中文", "English"]
+
 try:
     import serial
     from serial.tools import list_ports
@@ -503,7 +509,7 @@ class App:
                    command=self._schedule_apply).grid(row=row, column=1, sticky="w")
         row += 1
 
-        lab("BRT")
+        lab("亮度 / BRT")
         tk.Spinbox(p, from_=1, to=25, textvariable=self.v_brt, width=8,
                    command=self._schedule_apply).grid(row=row, column=1, sticky="w")
         row += 1
@@ -554,7 +560,7 @@ class App:
         self.v_trmode.trace_add("write", lambda *a: self._schedule_apply())
         row += 1
 
-        lab("输出")
+        lab("输出 / Out")
         f = tk.Frame(p)
         f.grid(row=row, column=1, sticky="w")
         tk.Checkbutton(f, text="PWM", variable=self.v_outpwm,
@@ -563,6 +569,39 @@ class App:
                        command=self._schedule_apply).pack(side="left")
         tk.Checkbutton(f, text="UART", variable=self.v_outuart,
                        command=self._schedule_apply).pack(side="left")
+        row += 1
+
+        # --- v1.2: 方波频率 / 占空比 / 波形类型 / 设备语言 ---
+        self.v_genfreq_txt = tk.StringVar(value=GEN_FREQ_TXT[0])
+        self.v_wavetype_txt = tk.StringVar(value=WAVE_TYPE_TXT[0])
+        self.v_lang_txt = tk.StringVar(value=LANG_TXT[0])
+
+        lab("方波频率 / Freq")
+        cb = ttk.Combobox(p, textvariable=self.v_genfreq_txt, values=GEN_FREQ_TXT,
+                          width=8, state="readonly")
+        cb.grid(row=row, column=1, sticky="w")
+        cb.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
+        row += 1
+
+        lab("占空比 / Duty")
+        sp = tk.Spinbox(p, from_=1, to=99, textvariable=self.v_genduty, width=8,
+                        command=self._schedule_apply)
+        sp.grid(row=row, column=1, sticky="w")
+        sp.bind("<KeyRelease>", lambda e: self._schedule_apply())
+        row += 1
+
+        lab("波形类型 / Wave")
+        cbw = ttk.Combobox(p, textvariable=self.v_wavetype_txt, values=WAVE_TYPE_TXT,
+                           width=10, state="readonly")
+        cbw.grid(row=row, column=1, sticky="w")
+        cbw.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
+        row += 1
+
+        lab("设备语言 / DSO Lang")
+        cbl = ttk.Combobox(p, textvariable=self.v_lang_txt, values=LANG_TXT,
+                           width=8, state="readonly")
+        cbl.grid(row=row, column=1, sticky="w")
+        cbl.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
         row += 1
 
         # --- 显示 ---
@@ -751,6 +790,12 @@ class App:
             self.v_genduty.set(s.get("genduty", 50))
             self.v_wavetype.set(s.get("wavetype", 0))
             self.v_lang.set(s.get("lang", 0))
+            try:
+                self.v_genfreq_txt.set(GEN_FREQ_TXT[self.v_genfreq.get() % len(GEN_FREQ_TXT)])
+                self.v_wavetype_txt.set(WAVE_TYPE_TXT[self.v_wavetype.get() % len(WAVE_TYPE_TXT)])
+                self.v_lang_txt.set(LANG_TXT[1 if self.v_lang.get() else 0])
+            except Exception:
+                pass
         except Exception:
             pass
         self._updating = False

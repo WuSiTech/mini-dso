@@ -13,6 +13,8 @@ __pycache__/
 *.noi
 
 # 本地备份 / 个人文件
+# 博客草稿等本地文档, 不入库
+docs/
 backup/
 *.bak
 *.orig

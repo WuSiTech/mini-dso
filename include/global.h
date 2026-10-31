@@ -86,7 +86,7 @@ extern bit PostEepromOk, PostCalOk, PostBgvOk;   /* 开机自检结果 */
 
 #define FW_VER_MAJOR 1
 #define FW_VER_MINOR 7
-#define FW_VER_PATCH 12
+#define FW_VER_PATCH 13
 #define FW_VERSION ((FW_VER_MAJOR << 8) | (FW_VER_MINOR << 4) | FW_VER_PATCH)
 
 extern __xdata uint8 InfoSel;   /* 信息页选中项: 0作者 1开发 2返回 */   /* 1: 正在显示创作者信息页 */        // P1.0 波形类型: 0正弦 1三角 2锯齿

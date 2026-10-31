@@ -546,23 +546,28 @@ void AnalyseData()
 */
 void OLED_DrawString_ScaleHTxt(int8 _ScaleH)
 {
-    /* 按实测采样间隔显示每格真实时间 (不再显示标称值) */
-    uint32 us = ((uint32)DtTbl[_ScaleH] * 25UL) / 100UL;
-
-    if (us >= 100000UL)
-        us = 99999UL;
-    if (us >= 1000UL)
-    {
-        OLED_DrawNum((uint16)(us / 1000UL), 2);
-        OLED_DrawString(".");
-        OLED_DrawNum((uint16)((us % 1000UL) / 10UL), 2);
-        OLED_DrawString("ms");
-    }
-    else
-    {
-        OLED_DrawNum((uint16)us, 3);
-        OLED_DrawString("us");
-    }
+  if (_ScaleH==0) OLED_DrawString("500ms"); //0
+  else if (_ScaleH==1) OLED_DrawString("300ms"); //1
+  else if (_ScaleH==2) OLED_DrawString("200ms"); //2
+  else if (_ScaleH==3) OLED_DrawString("150ms"); //3
+  else if (_ScaleH==4) OLED_DrawString("100ms"); //4
+  else if (_ScaleH==5) OLED_DrawString("50ms"); //5
+  else if (_ScaleH==6) OLED_DrawString("30ms"); //6
+  else if (_ScaleH==7) OLED_DrawString("20ms"); //7
+  else if (_ScaleH==8) OLED_DrawString("15ms"); //8
+  else if (_ScaleH==9) OLED_DrawString("10ms"); //9
+  else if (_ScaleH==10) OLED_DrawString("5ms"); //10
+  else if (_ScaleH==11) OLED_DrawString("3ms"); //11
+  else if (_ScaleH==12) OLED_DrawString("2ms"); //12
+  else if (_ScaleH==13) OLED_DrawString("1.5ms"); //13
+  else if (_ScaleH==14) OLED_DrawString("1ms"); //14
+  else if (_ScaleH==15) OLED_DrawString("500us"); //15
+  else if (_ScaleH==16) OLED_DrawString("300us"); //16
+  else if (_ScaleH==17) OLED_DrawString("200us"); //17
+  else if (_ScaleH==18) OLED_DrawString("150us"); //18
+  else if (_ScaleH==19) OLED_DrawString("100us"); //19
+  else if (_ScaleH==20) OLED_DrawString("80us"); //20
+  else               OLED_DrawString("---us");  // out of bounds
 }
 
 /* 绘制主界面

@@ -270,7 +270,7 @@ y = CHART_V_MIN + (plotADCMax - ADC) * (CHART_V_MAX - CHART_V_MIN)
 ```bat
 python py\flash.py COM5 build\wusi_minidso.hex   # 烧录(自动带 EEPROM 分区, 烧完写回校准数据)
 python py\dso_gui.py                            # 上位机(实时波形/FFT/光标/导出)
-python py\restore_all.py COM5                   # 只写回 CalTable + DtTbl 并回读校验
+python py\restore_all.py COM5                   # 写回 CalTable + DtTbl + TK/WS 并回读/重启校验
 python py\gen_cnfont.py                         # 重新生成中文字库 include/cnfont.h
 ```
 
@@ -510,7 +510,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 - **命令行**：`python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\wusi_minidso.hex`（需冷启动）
 - **运行中自动烧录**：`python py\flash.py COM5 build\wusi_minidso.hex`
   （固件收到 `0x14` 后软复位进 ISP；脚本会带 `program_eeprom_split=64512`，烧完自动调
-  `restore_all.py` 写回 CalTable + DtTbl）
+  `restore_all.py` 写回 CalTable + DtTbl + TK/WS）
 
 > 烧录会整片擦除 EEPROM：设置和校准表回到默认值。
 >
@@ -553,8 +553,8 @@ TriLevel(u16) TriMode TriSlope WaveFreqIdx Brightness OutPWM OutSIN OutUART
 GenFreqIdx GenDuty WaveType Lang`
 
 > DtTbl 是频率读数与时间轴的查表值：烧录 / 擦除后无效时固件按延时模型生成默认表，
-> 建议烧后用 `py/restore_all.py` 写回实测表（内置实测值，或 `build/dtcal.json`）；
-> 也可以用协议 0x21 / 0x22 单独读写。
+> 建议烧后用 `py/restore_all.py` 一次写回三张表：CalTable + DtTbl + TK/WS（DtTbl 优先取 `build/dtcal.json`），会回读校验并做一次 `0x13` 软复位验证掉电保持；
+> 也可以用协议 0x16/0x17、0x21/0x22、0x23/0x24 单独读写。
 
 ### 目录结构
 
@@ -881,7 +881,7 @@ y = CHART_V_MIN + (plotADCMax - ADC) * (CHART_V_MAX - CHART_V_MIN)
 ```bat
 python py\flash.py COM5 build\wusi_minidso.hex   # flash (sets EEPROM split, then restores calibration)
 python py\dso_gui.py                            # PC host (live waveform / FFT / cursors / export)
-python py\restore_all.py COM5                   # write back CalTable + DtTbl and verify
+python py\restore_all.py COM5                   # write back CalTable + DtTbl + TK/WS and verify
 python py\gen_cnfont.py                         # regenerate the Chinese font (include/cnfont.h)
 ```
 
@@ -1108,7 +1108,7 @@ Regenerate the Chinese font after edits: `python py\gen_cnfont.py` (writes the G
 - STC-ISP: chip STC8A8K64D4, IRC 45 MHz, `build/wusi_minidso.hex`, power-cycle to download
 - `python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\wusi_minidso.hex`
 - `python py\flash.py COM5 build\wusi_minidso.hex` — sends `0x14` so the firmware jumps to ISP itself,
-  passes `program_eeprom_split=64512`, then restores CalTable + DtTbl via `restore_all.py`
+  passes `program_eeprom_split=64512`, then restores CalTable + DtTbl + TK/WS via `restore_all.py`
 
 Flashing erases the whole EEPROM (settings and calibration table).
 **EEPROM user area = 1 KB**: the default `program_eeprom_split=65024` leaves only 0.5 KB;

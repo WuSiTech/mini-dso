@@ -254,6 +254,37 @@ void getWaveFreq()
     }
     den = (uint32)wsum * dt100;
     WaveFreq = (uint32)(((uint32)100000000UL * (uint32)wnum) / den);
+
+    /* robust frequency estimate: count crossings of the trigger level over the
+       whole buffer, then divide by the calibrated sample interval */
+    {
+        uint16 idx2, first = 0, last = 0;
+        uint8 n = 0;
+        uint8 lvl = (uint8)TriLevel;
+
+        for (idx2 = 1; idx2 < SAMPLE_NUM; idx2++)
+        {
+            uint8 a = *(ADCbuf + idx2 - 1);
+            uint8 b2 = *(ADCbuf + idx2);
+            uint8 hit;
+
+            if (TriSlope)
+                hit = (a <= lvl && b2 > lvl) ? 1 : 0;
+            else
+                hit = (a >= lvl && b2 < lvl) ? 1 : 0;
+
+            if (hit)
+            {
+                if (n == 0)
+                    first = idx2;
+                last = idx2;
+                n++;
+            }
+        }
+        if (n >= 2 && last > first && DtTbl[ScaleH] > 0)
+            WaveFreq = (float)(((uint32)(n - 1) * 100000000UL)
+                               / ((uint32)(last - first) * DtTbl[ScaleH]));
+    }
 }
 
 /* ½«mv×ª»»ÎªADC

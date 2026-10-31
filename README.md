@@ -1,4 +1,4 @@
-# Mini-DSO v1.4 — STC8A8K64D4 @ 45 MHz
+# Mini-DSO v1.4.1 — STC8A8K64D4 @ 45 MHz
 
 **中文** | [English](#english-version)
 
@@ -17,13 +17,18 @@
 - **中英双语界面**：设置页/信息页/启动页一键切换中文 ⇄ English，语言存 EEPROM
 - **可以使用电脑作为上位机**：`py/dso_gui.py` 提供实时波形、FFT、自动测量、双光标、
   时基一键校准、参数读写、EEPROM 保存、波形 CSV / 截图 PNG 导出；
+  启动时**自动识别示波器串口**并自动读回全部参数；暂停按钮会**同时暂停单片机**；
+  暂停时波形下方出现**与设备实时同步的滚动条**；界面/提示完整中英双语；
   无硬件时可用 `--demo` 演示。**软件就在仓库的 `py/` 目录**
 - **21 档时基** 500 ms/div … 80 µs/div，逐档实测校准（EEPROM 可软件再校准）
 - **双光标测量**：设备端独立光标页，直接读出 `dT` / `dV`（画在最底行）
 - **可调信号源**：P1.1 方波 15 档频率（≈1 Hz~42 kHz）+ 占空比 1~99 %；
   P1.0 可输出正弦 / 三角 / 锯齿（经外部 RC）
 - **中文点阵字库**：12×12 像素风，由 `py/gen_cnfont.py` 自动生成
+- **波形滚动只在暂停时可用**：暂停后按住旋钮把光标切到左下角标尺（选中即反色），
+  旋转即左右滚动；运行中没有这个选项，上电/读参数后旧的全局滚动模式已停用
 - **串口协议完整**：采样流 + 参数读写 + EEPROM 保存 + 时基校准表 + 固件版本查询
+  + 波形滚动位置读写（0x1A/0x1B）+ 运行/暂停（0x1C）
 - 开机启动页 + 自检（EEPROM / 校准表 / 电池电压），烧录可软复位进 ISP
 
 ### 来源与致谢
@@ -64,11 +69,16 @@
 | 操作 | 作用 |
 |---|---|
 | **旋转** | 调整当前选中项的值（时基 / 量程 / 触发电平 / 触发沿 / 触发方式） |
-| **按住 + 旋转** | 切换要调的项目（不会进入设置） |
+| **按住 + 旋转** | 切换要调的项目（不会进入设置）；**暂停时**循环里多出第 6 项"滚动位置" |
 | **短按** | **Run ⇄ Stop** 立即切换，画面冻结在按下瞬间 |
 | **长按 ≥0.5 s** | 进入设置页 |
 
-#### 设置页（13 项）
+- 运行中可选 5 项：时基 / 量程 / 触发电平 / 触发沿 / 触发方式
+- **暂停后**多出第 6 项 **滚动位置**：光标移到它上面时左下角标尺**整条反色**，
+  此时旋转 = 左右滚动波形；切到其它项就恢复各自调参
+- 双击功能已移除（只用于设置页的"取消修改"，见下）
+
+#### 设置页（14 项）
 
 旋转 = 改当前项的值；**按住 + 旋转** = 在项目间移动；**长按** = 保存并退出。
 
@@ -77,8 +87,14 @@
 方波输出      方波频率    占空比
 波形输出      波形类型    串口输出
 语言          光标测量 >
-创作者信息 >  电池电压
+创作者信息 >  校准表 >
+电池电压
 ```
+
+- **长按**：保存到 EEPROM，屏幕提示 `保存成功 / 保存失败`
+- **短按两下**（仅设置页有效）：**取消修改**，从 EEPROM 回滚全部参数和校准表，
+  提示 `已取消修改`，然后自动返回上一级（子页面→设置列表；设置列表→主界面）
+- 主页**不会**响应双击（避免和 Run/Stop 冲突）
 
 - **旋钮加速**：仅 4 个纯数值项（亮度 / 分压系数 / 方波频率 / 占空比）加速
   （慢转 1 步、≤120 ms 2 步、≤50 ms 3 步）；其他项一律 1 格 1 步
@@ -104,6 +120,19 @@
 页面显示 LOGO、原作、开发、项目地址；`按住 + 旋转` 选择条目，
 `旋转` 显示对应网址（长网址自动轮播），选到 `<Back` 旋转即返回；长按直接退回。
 
+#### 校准表页
+
+进入：设置页滚到「校准表 >」，**再旋转一格**进入。显示 `CAL 档位/20 + 对应时基`，
+列表一次显示 5 档（`#档号  校准值`，选中行白底黑字）。
+
+| 操作 | 作用 |
+|---|---|
+| 按住 + 旋转 | 切换要调的档位（0~20） |
+| 旋转 | 微调该档校准值（慢转 ±1，快速转 ±8） |
+| 长按 | **立即写 EEPROM 并提示保存成功**，然后回设置列表 |
+
+这就是上位机「一键校准」写的那张表（21 档延时/偏移量），设备上也能直接看和改。
+
 #### 信号源
 
 1. 设置页打开 `方波输出`（P1.1）和/或 `波形输出`（P1.0）
@@ -126,11 +155,14 @@ python py\dso_gui.py --selftest :: 协议自检
 **步骤**：
 
 1. 设备设置里确认 `串口输出 = ON`（默认开），USB 串口接电脑
-2. 打开软件 → 选端口 → 点「连接」（选不到端口就点「刷新」）
-3. 波形自动刷新；右侧参数面板改任何值**即时生效**（不等按钮）
-4. 点「保存到 EEPROM」把当前参数写进设备
-5. 点「读取」可随时把设备参数读回来
-6. 「一键校准」会驱动设备输出测试方波、自动测量 21 档时基并写回校准表
+2. 打开软件：会**自动扫描串口并识别示波器**（发 0x19 探测），识别到就自动选好 COM
+3. 点「连接」→ 自动读回全部参数（时基/量程/触发/亮度/方波频率/波形类型/语言…），
+   状态栏显示固件版本
+4. 参数面板改任何值**即时生效**（不等按钮）
+5. 点「保存到 EEPROM」把当前参数写进设备；「读取」可随时读回
+6. 「一键校准」会驱动设备输出测试方波、自动测量全部 21 档时基并写回校准表
+7. **暂停**：同时暂停单片机（0x1C），上位机界面不冻结；此时波形下方**滚动条**可拖，
+   位置与设备左下角标尺双向同步
 
 **界面功能**：
 
@@ -139,13 +171,14 @@ python py\dso_gui.py --selftest :: 协议自检
 | 波形区 | 实时波形（矢量/点阵）；滚轮缩放、Ctrl+滚轮纵向、拖动平移 |
 | 测量 | Vpp / Vmax / Vmin / Vrms / Vavg / 频率 / 周期 / 占空比 / 上升时间 |
 | 光标 | Shift+左键放置、拖动、双击复位，显示 Δt / ΔV |
-| 参数面板 | 绘图模式、亮度(BRT)、LSB、时基、量程、触发电平/沿/方式、输出开关、方波频率、占空比、波形类型、设备语言 |
+| 参数面板 | 绘图模式、亮度(BRT)、分压系数 LSB、时基、电压量程、触发电平/沿/方式、输出开关、方波频率、占空比、波形类型、设备语言 |
 | 频谱 | 切到 FFT 视图（128 点 Hann 窗） |
-| 暂停 | 停止刷新画面（串口继续收） |
+| 暂停 | 暂停**单片机**采样（0x1C），界面照常刷新、最后一帧保留 |
+| 滚动条 | 暂停时可用：拖动左右滚动波形，与设备标尺位置实时同步 |
 | 保存波形 (CSV) | 时间 / 原始 ADC / 电压(mV) |
 | 保存截图 (PNG) | 当前画面 |
 | 语言 | 上位机界面中英切换 |
-| 一键校准 | 自动校 21 档时基 |
+| 一键校准 | 自动校全部 21 档时基（慢档低频率参考、快档 9 kHz 参考） |
 
 ### 编译
 
@@ -158,7 +191,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 > ⚠️ **必须带 `--stack-auto`**：8051 直接寻址 RAM 只有 128 B，不加会报
 > `Could not get ... consecutive bytes in internal RAM for area DSEG`。
 
-资源占用（v1.2.0）：ROM 36,738 / 64,512 (57%)、XRAM 3,551 / 8,192、栈 218 B。
+资源占用（v1.4.1）：ROM 38,693 / 64,512 (60%)、XRAM 3,558 / 8,192、栈 217 B。
 
 中文字库改了之后重新生成：`python py\gen_cnfont.py`（不要手改 `include/cnfont.h`）。
 
@@ -191,6 +224,9 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 | 0x15 | PC→DSO | 输出测试方波 |
 | 0x16 / 0x17 | PC→DSO | 写 / 读时基校准表（21×uint16） |
 | 0x19 | DSO→PC | 固件信息（版本/长度/能力/tick） |
+| 0x1A | DSO→PC | 波形滚动位置：`[0]offset(int8) [1]TriPos [2]running [3]最大偏移` |
+| 0x1B | PC→DSO | 设置滚动位置：`[0]=offset(int8)` |
+| 0x1C | PC→DSO | 运行/暂停：`[0]=1 运行 / 0 暂停` |
 
 参数块（22 B）：`Lsb(u16) PlotMode ScaleH ScaleV_Auto RulerVMax(u16) RulerVMin(u16)
 TriLevel(u16) TriMode TriSlope WaveScroll Brightness OutPWM OutSIN OutUART
@@ -203,7 +239,7 @@ mini-dso/
 ├─ src/            固件源码
 ├─ include/        头文件（cnfont.h 中文字模、bmp.h LOGO、keys.h …）
 ├─ user/main.c     主程序 + 中断 + 主循环
-├─ build/          minidso.hex（原版）/ minidso_uart.hex（当前 v1.2.0）
+├─ build/          minidso.hex（原版）/ minidso_uart.hex（当前 v1.4.1）
 ├─ py/             上位机与工具（dso_gui.py / flash.py / test_tb.py / gen_cnfont.py）
 ├─ build.ps1       一键编译
 └─ README.md
@@ -216,8 +252,11 @@ mini-dso/
 - BGV 实测 1185 mV（代码回退 1200 mV）
 - IRAM 已满，新增全局变量请放 `__xdata`
 - 所有 C 源文件是 **GBK** 编码
-- 双击功能已移除（和"短按 Run/Stop"冲突）
+- 双击功能已移除；**设置页里的"连按两下"= 取消修改**，主页不响应双击
+- 波形滚动只在**暂停**时可用（运行中旋转永远调参数）
+- 旧的全局 `WaveScroll` 模式已停用（参数块里该字节固定为 0，只为协议兼容保留）
 - 不启用看门狗：长时基采样一轮 4.4 s，软件无法与卡死区分，会误复位
+- 暂停后恢复运行不会再清屏：先保留旧波形，等这轮扫描完成再刷新（慢时基约 4.4 s）
 
 ### 许可
 
@@ -238,13 +277,18 @@ plus further development.
 - **Bilingual UI** (Chinese ⇄ English), language stored in EEPROM
 - **PC host software included**: `py/dso_gui.py` gives live waveform, FFT, automatic
   measurements, dual cursors, one-click time-base calibration, parameter read/write,
-  EEPROM save, CSV/PNG export, `--demo` mode without hardware
+  EEPROM save, CSV/PNG export, `--demo` mode without hardware.
+  It auto-detects the scope's COM port on startup, reads all settings, keeps the UI in
+  sync, and its Pause button pauses the MCU too. **The software lives in `py/`**
 - **21 time-base ranges** (500 ms/div … 80 µs/div), individually calibrated
 - **On-device dual-cursor page** showing `dT` / `dV` on the bottom line
+- **Waveform scroll is paused-only**: while paused, press+rotate to the bottom-left
+  ruler (it inverts when selected) and rotate to scroll; while running it is unavailable
 - **Signal generator**: P1.1 square wave, 15 frequencies (≈1 Hz–42 kHz), duty 1–99 %;
   P1.0 sine / triangle / sawtooth (needs RC filter)
 - 12×12 pixel Chinese font, generated by `py/gen_cnfont.py`
-- Full UART protocol: sample stream, settings R/W, EEPROM save, calibration table, version query
+- Full UART protocol: sample stream, settings R/W, EEPROM save, calibration table,
+  version query, scroll position read/write (0x1A/0x1B), run/pause (0x1C)
 
 ### Credits
 
@@ -261,10 +305,18 @@ plus further development.
 | Short press | Run ⇄ Stop immediately |
 | Long press (≥0.5 s) | Enter / exit settings |
 
+While running there are 5 selectable items; **once paused** a 6th one appears –
+*scroll position*: press+rotate onto it (the bottom-left ruler inverts), then rotate to
+scroll the waveform left/right. Other items keep adjusting their own parameter.
+Double-click on the main screen was removed.
+
 Settings page: rotate = change value, **press+rotate = move between items**,
-long press = save and exit. 13 items:
+long press = **save to EEPROM and show `Save Success`**,
+**double-click = discard changes** (reloads settings + calibration from EEPROM, shows
+`Changes discarded`, then returns one level up). Double-click only works inside settings.
+14 items:
 `Plot mode, Brightness, LSB, PWM out, PWM freq, Duty, Wave out, Wave type, UART out,
-Language, Cursor >, Dev-er Info >, Batt voltage`.
+Language, Cursor >, Dev-er Info >, Cal table >, Batt voltage`.
 Encoder acceleration applies only to the four numeric items (brightness, LSB,
 PWM frequency, duty): 1 step slow, 2 steps ≤120 ms, 3 steps ≤50 ms.
 
@@ -276,6 +328,11 @@ Creator info page: select “Dev-er Info” then rotate to open; press+rotate se
 Original / Developer / Project URL / `<Back`; rotate shows the corresponding URL
 (marquee for long URLs); long press returns.
 
+Calibration table page: select “Cal table” then rotate to open. Shows `CAL n/20` plus the
+matching time base and 5 entries (`#index  value`, selected row inverted).
+Press+rotate = choose index, rotate = adjust value (slow ±1, fast ±8),
+long press = **write EEPROM immediately (save message)** and go back to the settings list.
+
 ### Controls (PC host, `py/dso_gui.py`)
 
 ```bat
@@ -286,15 +343,20 @@ python py\dso_gui.py --selftest :: protocol self-test
 ```
 
 1. Set `UART out = ON` on the device and connect its USB serial port
-2. Choose the port and press “Connect”
-3. Parameter changes on the right panel are applied immediately
-4. “Save to EEPROM” writes them to the device; “Read” fetches them back
-5. “One-click calibrate” measures all 21 time bases and writes the calibration table
+2. Start the software – it **auto-detects the scope** (probes 0x19) and preselects the COM port
+3. Press “Connect” – all parameters are read back automatically and the firmware version
+   appears in the status bar
+4. Parameter changes on the right panel are applied immediately
+5. “Save to EEPROM” writes them to the device; “Read” fetches them back
+6. “One-click calibrate” measures all 21 time bases and writes the calibration table
+7. **Pause also pauses the MCU** (0x1C) while the GUI keeps refreshing; a horizontal
+   **scroll slider** under the waveform then scrolls the device (bidirectional sync)
 
 Waveform view: mouse wheel = zoom, Ctrl+wheel = vertical, drag = pan.
 Measurements: Vpp/Vmax/Vmin/Vrms/Vavg/frequency/period/duty/rise time.
-Cursors: Shift+click to place, drag to move, double-click to reset (Δt/ΔV).
-Also: FFT view, pause, CSV/PNG export, UI language switch.
+Cursors: Shift+click to place, drag to move, double-click to reset (Δt/ΔV),
+or press the “Cursor” button to drop both at once.
+Also: FFT view, pause, CSV/PNG export, full UI language switch.
 
 ### Build
 
@@ -305,7 +367,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
 `--stack-auto` is mandatory (only 128 B of directly addressable IRAM).
-Current usage: ROM 36,738 / 64,512 B, XRAM 3,551 / 8,192 B, stack 218 B.
+Current usage (v1.4.1): ROM 38,693 / 64,512 B, XRAM 3,558 / 8,192 B, stack 217 B.
 
 ### Flash
 
@@ -324,7 +386,9 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 
 `0x01` sample frame (28 B header + N×uint16), `0x02` ACK, `0x03` settings block (22 B),
 `0x10` set, `0x11` save, `0x12` get, `0x14` reboot to ISP, `0x15` test square,
-`0x16`/`0x17` write/read calibration table, `0x19` firmware info.
+`0x16`/`0x17` write/read calibration table, `0x19` firmware info,
+`0x1A` scroll position read (`[0]offset [1]TriPos [2]running [3]max offset`),
+`0x1B` scroll position set (`[0]=offset`), `0x1C` run/pause (`[0]=1 run / 0 pause`).
 
 ### Known issues
 
@@ -332,8 +396,12 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 - Square-wave frequencies derive from `GEN_TICK_US10 = 120` (12.0 µs/tick) and are approximate
 - IRAM is full — put new globals in `__xdata`
 - C sources are **GBK** encoded
-- Double-click was removed (conflicts with single-press Run/Stop)
+- Double-click was removed from the main screen; inside settings a double-click means
+  *discard changes*
+- Waveform scrolling is paused-only (running always adjusts parameters)
+- The old global `WaveScroll` mode is disabled (the settings byte stays 0 for protocol compatibility)
 - Watchdog intentionally disabled (long sweeps look like a hang)
+- Resuming from pause keeps the old trace until the new sweep finishes (≈4.4 s at 500 ms/div)
 
 ### License
 

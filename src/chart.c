@@ -1273,12 +1273,12 @@ void PlotInfoPage(void)
         {
             OLED_DrawCNStr(0, 40, S_Proj);
             OLED_Set_Pos(7 * CN_W + 2, 42);
-            OLED_DrawString("(v1.3)");
+            OLED_DrawString("(v1.4.1)");
         }
         else
         {
             OLED_Set_Pos(0, 42);
-            OLED_DrawString("PROJ:(v1.3)");
+            OLED_DrawString("PROJ:(v1.4.1)");
         }
     }
     OLED_Reverse(0);

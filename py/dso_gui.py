@@ -1474,7 +1474,8 @@ class App:
                                           % self.link.rx_bytes)
 
         now = time.time()
-        if now - getattr(self, "_scr_last_poll", 0.0) > 0.25:
+        # 只有在"已暂停"时才查滚动位置: 连续轮询会挤占采样帧(慢时基会看起来卡住)
+        if self.paused and (now - getattr(self, "_scr_last_poll", 0.0) > 0.35):
             self._scr_last_poll = now
             self._poll_scroll()
 

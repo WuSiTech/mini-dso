@@ -50,6 +50,8 @@ T_INFO = 0x19       # 固件信息(版本/能力)
 T_SCRL = 0x1A       # 读滚动位置
 T_SCRS = 0x1B       # 写滚动位置
 T_RUN = 0x1C        # 运行/暂停
+T_DTM = 0x1F        # 读延时模型系数(10B)
+T_DTMW = 0x20       # 写延时模型系数
 T_OUTO = 0x1D       # 读输出波偏移表(21×int16)
 T_OUTW = 0x1E       # 写输出波偏移表
 
@@ -1231,6 +1233,25 @@ class App:
             e.grid(row=i // 3, column=(i % 3) * 2 + 1, padx=3, pady=1)
             self._outcal_vars.append(v)
 
+        mrow = tk.Frame(win)
+        mrow.pack(fill="x", padx=6, pady=(6, 0))
+        tk.Label(mrow, text="延时模型:", anchor="w").pack(side="left")
+        self._dtm_names = ["A1", "B1", "A2", "B2", "THR"]
+        self._dtm_vars = []
+        for nm in self._dtm_names:
+            tk.Label(mrow, text=nm).pack(side="left", padx=(6, 1))
+            v = tk.IntVar(value=0)
+            tk.Entry(mrow, textvariable=v, width=7).pack(side="left")
+            self._dtm_vars.append(v)
+        mbar = tk.Frame(win)
+        mbar.pack(fill="x", padx=6, pady=(2, 6))
+        tk.Button(mbar, text=self._tr("读取模型"), command=self._dtm_read).pack(side="left", padx=3)
+        tk.Button(mbar, text=self._tr("写入模型"), command=self._dtm_write).pack(side="left", padx=3)
+        tk.Button(mbar, text=self._tr("基准校准(STM32)"),
+                  command=lambda: self._run_tool("dtcal.py")).pack(side="left", padx=3)
+        tk.Button(mbar, text=self._tr("烧后写回"),
+                  command=lambda: self._run_tool("restore_all.py")).pack(side="left", padx=3)
+
         bar = tk.Frame(win)
         bar.pack(fill="x", padx=6, pady=6)
         tk.Button(bar, text=self._tr("读取"), command=self._outcal_read).pack(side="left", padx=3)
@@ -1257,6 +1278,39 @@ class App:
         except Exception:
             pass
         self._outcal_win = None
+
+    def _dtm_read(self):
+        if self.link and not self.demo:
+            self._send(build_frame(int(T_DTM)))
+
+    def _dtm_write(self):
+        if not (self.link and not self.demo):
+            return
+        vals = [max(0, min(65535, int(v.get()))) for v in self._dtm_vars]
+        pay = b"".join(struct.pack("<H", v) for v in vals)
+        self._send(build_frame(int(T_DTMW), pay))
+        self._msg("延时模型系数已写入 EEPROM")
+
+    def _run_tool(self, name):
+        """调用 py/ 下的工具脚本(异步, 输出到提示区)"""
+        import subprocess
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+        if not os.path.exists(script):
+            self._msg("找不到 " + name)
+            return
+        self._msg("正在运行 %s ..." % name)
+
+        def worker():
+            try:
+                r = subprocess.run([sys.executable, script], capture_output=True,
+                                   text=True, timeout=600)
+                out = (r.stdout or "").strip().splitlines()
+                tail = out[-1] if out else ("失败: " + (r.stderr or "")[:120])
+                self._tmsg("%s 完成: %s" % (name, tail))
+            except Exception as e:
+                self._tmsg("%s 失败: %r" % (name, e))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _outcal_read(self):
         if self.link and not self.demo:
@@ -2019,6 +2073,11 @@ class App:
                 self.pending_save = 0.0
                 self._msg("Save succeed" if payload[1] else "Save failed!")
                 self._hint("")
+        elif type_ == int(T_DTM):
+            if len(payload) >= 10 and getattr(self, "_dtm_vars", None):
+                v = struct.unpack("<5H", payload[:10])
+                for k in range(5):
+                    self._dtm_vars[k].set(int(v[k]))
         elif type_ == int(T_OUTO):
             if len(payload) >= 42:
                 self._outcal_vals = list(struct.unpack("<21h", payload[:42]))

@@ -1174,11 +1174,11 @@ void SetGenParams(void)
     }
     tick = GEN_TICK_US10;        /* 1 tick = GEN_TICK_US10/10 us */
     pre = 1;
-    while ((p10 / (tick * pre)) > 60000UL && pre < 128)
+    while ((p10 / ((GenTickCal ? GenTickCal : 120) * pre)) > 60000UL && pre < 128)
         pre <<= 1;
 
     GenPre = pre;
-    GenPeriod = (uint16)(p10 / (tick * pre));
+    GenPeriod = (uint16)(p10 / ((GenTickCal ? GenTickCal : 120) * pre));
     if (GenPeriod < 2)
         GenPeriod = 2;
 

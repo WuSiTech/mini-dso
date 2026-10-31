@@ -670,6 +670,29 @@ void check_Options()
    布局: [0..17] 设置  [18..31] 0xFF  [32..33] 'C','L'  [34..75] 校准表(21x16bit LE)  [76] 校验和 */
 static __xdata uint8 EeBuf[82];
 
+/* 参数无效(新片/擦除后)时载入的默认值: 两个波形输出都关 */
+static void Load_Defaults(void)
+{
+    Lsb = 600;
+    PlotMode = 1;
+    ScaleH = 15;              /* 500us/div */
+    ScaleV_Auto = 1;
+    RulerVMax = 3000;
+    RulerVMin = 0;
+    TriLevel = 1500;
+    TriMode = 0;
+    TriSlope = 1;
+    WaveScroll = 0;
+    OLED_Brightness = 10;
+    OutPWM = 0;               /* 方波输出: 默认关 */
+    OutSIN = 0;               /* 波形输出: 默认关 */
+    OutUART = 1;
+    GenFreqIdx = 9;
+    GenDuty = 50;
+    WaveType = 0;
+    Lang = 1;
+}
+
 bit Save_Options()
 {
     uint8 *p;
@@ -714,6 +737,14 @@ bit Save_Options()
         sum += EeBuf[34 + i];
     EeBuf[76] = sum;
 
+    /* 参数块校验: 'M','S' + 22 字节和 */
+    sum = 0;
+    for (i = 0; i < 22; i++)
+        sum += EeBuf[i];
+    EeBuf[77] = 'M';
+    EeBuf[78] = 'S';
+    EeBuf[79] = sum;
+
     return EEPROM_Save(EeBuf, 81);
 }
 
@@ -723,6 +754,19 @@ void Read_Options()
     uint8 i, sum, ok;
 
     EEPROM_Read(EeBuf, 81);
+
+    /* 参数块校验: 擦除后全 0xFF 不能当成有效参数(否则输出全被打开) */
+    sum = 0;
+    for (i = 0; i < 22; i++)
+        sum += EeBuf[i];
+    if (EeBuf[77] != 'M' || EeBuf[78] != 'S' || EeBuf[79] != sum)
+    {
+        Load_Defaults();
+        EepromValid = 0;
+        WaveScroll = 0;
+        check_Options();
+        return;
+    }
 
     p = EeBuf;
     Lsb = *p++;

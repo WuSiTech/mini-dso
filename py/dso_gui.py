@@ -469,6 +469,67 @@ class DemoSource(threading.Thread):
 # --------------------------------------------------------------------------
 # 界面
 # --------------------------------------------------------------------------
+
+class _Tip:
+    """轻量悬停提示: 鼠标停留 350ms 显示, 跟随光标; 文本可为 str 或 callable"""
+    _win = None
+    _job = None
+
+    def __init__(self, widget, text, delay=350):
+        self.w = widget
+        self.text = text
+        self.delay = delay
+        widget.bind("<Enter>", self._enter, add="+")
+        widget.bind("<Leave>", self._leave, add="+")
+        widget.bind("<ButtonPress>", self._leave, add="+")
+
+    def _enter(self, _ev=None):
+        self._cancel()
+        self._job = self.w.after(self.delay, self._show)
+
+    def _leave(self, _ev=None):
+        self._cancel()
+        self._hide()
+
+    def _cancel(self):
+        if self._job is not None:
+            try:
+                self.w.after_cancel(self._job)
+            except Exception:
+                pass
+            self._job = None
+
+    def _show(self):
+        self._job = None
+        txt = self.text() if callable(self.text) else self.text
+        if not txt:
+            return
+        _Tip._hide()
+        x, y = self.w.winfo_pointerxy()
+        win = tk.Toplevel(self.w)
+        win.wm_overrideredirect(True)
+        win.attributes("-topmost", True)
+        lab = tk.Label(win, text=txt, justify="left", bg="#ffffe0", fg="#333",
+                       relief="solid", bd=1, padx=6, pady=3,
+                       font=("Segoe UI", 9), wraplength=300)
+        lab.pack()
+        win.update_idletasks()
+        w, h = win.winfo_reqwidth(), win.winfo_reqheight()
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        px = min(x + 14, sw - w - 8)
+        py = min(y + 18, sh - h - 8)
+        win.wm_geometry("+%d+%d" % (px, py))
+        _Tip._win = win
+
+    @classmethod
+    def _hide(cls):
+        if cls._win is not None:
+            try:
+                cls._win.destroy()
+            except Exception:
+                pass
+            cls._win = None
+
 class App:
     def __init__(self, root, demo=False):
         self.root = root
@@ -592,10 +653,18 @@ class App:
         self.btn_pause.pack(fill="x", padx=2, pady=1)
 
         f = srow("参数")
-        btns(f, [("读取", self._read_all), ("保存设置", self._save)])
+        self.btn_read = tk.Button(f, text="读取", command=self._read_all)
+        self.btn_read.grid(row=0, column=0, padx=2, pady=1, sticky="ew")
+        self.btn_save = tk.Button(f, text="保存设置", command=self._save)
+        self.btn_save.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
+        f.columnconfigure(0, weight=1, uniform="pb"); f.columnconfigure(1, weight=1, uniform="pb")
 
         f = srow("导出")
-        btns(f, [("保存波形 CSV", self._save_wave), ("保存截图 PNG", self._save_shot)])
+        self.btn_wave = tk.Button(f, text="保存波形 CSV", command=self._save_wave)
+        self.btn_wave.grid(row=0, column=0, padx=2, pady=1, sticky="ew")
+        self.btn_shot = tk.Button(f, text="保存截图 PNG", command=self._save_shot)
+        self.btn_shot.grid(row=0, column=1, padx=2, pady=1, sticky="ew")
+        f.columnconfigure(0, weight=1, uniform="ex"); f.columnconfigure(1, weight=1, uniform="ex")
 
         f = srow("视图 / 界面")
         self.btn_view = tk.Button(f, text="频谱", command=self._toggle_view)
@@ -624,6 +693,8 @@ class App:
         self.btn_wvcal.grid(row=0, column=2, padx=2, pady=1, sticky="ew")
         for i in range(3):
             f.columnconfigure(i, weight=1, uniform="aud")
+
+        self._add_tips()
 
         wrap = tk.Frame(right)
         wrap.pack(side="top", fill="both", expand=True)
@@ -1168,7 +1239,9 @@ class App:
                   command=lambda: self._audio_calibrate("sq")).pack(side="left", padx=3)
         tk.Button(bar, text=self._tr("声卡校准(波形)"),
                   command=lambda: self._audio_calibrate("wv")).pack(side="left", padx=3)
-        tk.Button(bar, text=self._tr("关闭"), command=self._outcal_close).pack(side="right", padx=3)
+        b_close = tk.Button(bar, text=self._tr("关闭"), command=self._outcal_close)
+        b_close.pack(side="right", padx=3)
+        _Tip(b_close, (lambda: "关闭本窗口（不写设备）" if self.lang == "cn" else "Close this dialog (no write)"))
 
     def _outcal_close(self):
         try:
@@ -1444,6 +1517,40 @@ class App:
         pay = b"".join(struct.pack("<h", max(-32768, min(32767, int(v)))) for v in vals)
         self._send(build_frame(int(T_OUTW), pay))
         time.sleep(0.6)
+
+    def _add_tips(self):
+        """给主界面按钮挂悬停说明(中/英随界面语言)"""
+        tips = [
+            (self.btn_pause, ("暂停 / 继续：暂停时单片机和上位机同步停下，界面不冻结\n恢复后先保留旧波形，等这轮扫描完成再刷新",
+                              "Pause / resume: pauses both the MCU and the plot input\nThe old trace is kept until the next sweep finishes")),
+            (getattr(self, "btn_read", None), ("从设备读回全部参数（并显示固件版本）",
+                                               "Read all settings from the device")),
+            (getattr(self, "btn_save", None), ("把当前参数写入设备 EEPROM",
+                                               "Save current settings to device EEPROM")),
+            (getattr(self, "btn_wave", None), ("把当前波形导出为 CSV（时间 / 原始 ADC / 电压）",
+                                               "Export current waveform to CSV")),
+            (getattr(self, "btn_shot", None), ("把当前界面保存为 PNG 截图",
+                                               "Save the current view as PNG")),
+            (self.btn_view, ("切换 波形 / 频谱(FFT) 视图",
+                             "Toggle waveform / FFT view")),
+            (self.btn_cur, ("显示或清除两条测量光标（也可 Shift+左键放置、拖动、双击清除）",
+                            "Show/clear the two cursors (or Shift+click to place, drag, double-click to clear)")),
+            (self.btn_lang, ("切换上位机界面语言（中文 / English）",
+                             "Switch the GUI language")),
+            (self.btn_cal, ("时基自校：设备自己输出测试方波，逐档测量并回写 21 档时基表\n（自洽校准，约 1~2 分钟）",
+                            "Time-base self calibration: the device generates its own reference square wave\nand rewrites the 21 ranges (self-consistent, ~1-2 min)")),
+            (self.btn_outcal, ("打开输出波偏移表：21 个值 = 方波 15 档 + 波形 6 档\n可读取 / 写入 EEPROM，也可在这里启动声卡校准",
+                               "Output frequency offset table: 21 values (15 square + 6 wave)\nRead/write EEPROM, or start audio calibration here")),
+            (self.btn_tbcal, ("声卡校时基（绝对基准）：电脑耳机播放 1 kHz 到示波器 INPUT，\n按声卡晶振测出时基误差并缩放全部 21 档，需要接线",
+                              "Audio time-base calibration (absolute): play 1 kHz from the PC headphone output into the DSO INPUT,\nthen scale all 21 ranges — requires a cable")),
+            (self.btn_sqcal, ("声卡校方波输出：把 PWM 环经分压接到声卡输入，自动测频并回写方波 15 档偏移",
+                              "Audio calibration of the square output: wire the PWM loop to the sound-card input")),
+            (self.btn_wvcal, ("声卡校波形输出：把 SIN 环经分压接到声卡输入，自动测频并回写波形 6 档偏移",
+                              "Audio calibration of the sine/tri/saw output: wire the SIN loop to the sound-card input")),
+        ]
+        for w, t in tips:
+            if w is not None:
+                _Tip(w, (lambda tt=t: tt[0] if self.lang == "cn" else tt[1]))
 
     def _toggle_pause(self):
         """暂停/继续: 让单片机一起停/走(0x1C), 上位机界面本身不冻结"""

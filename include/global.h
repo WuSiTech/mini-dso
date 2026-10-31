@@ -69,7 +69,7 @@ extern bit PostEepromOk, PostCalOk, PostBgvOk;   /* 开机自检结果 */
 #define GEN_TICK_US10 120   /* 信号源 1 tick = 12.0us (实测) */
 
 #define FW_VER_MAJOR 1
-#define FW_VER_MINOR 2
+#define FW_VER_MINOR 3
 #define FW_VER_PATCH 0
 #define FW_VERSION ((FW_VER_MAJOR << 8) | (FW_VER_MINOR << 4) | FW_VER_PATCH)
 

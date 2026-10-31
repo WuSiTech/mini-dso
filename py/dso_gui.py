@@ -559,8 +559,10 @@ class App:
         self.btn_view.grid(row=1, column=2, padx=2, pady=2, sticky="ew")
         self.btn_lang = tk.Button(bgrid, text="English", command=self._toggle_lang)
         self.btn_lang.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
+        self.btn_cur = tk.Button(bgrid, text="光标", command=self._toggle_cursors)
+        self.btn_cur.grid(row=2, column=1, padx=2, pady=2, sticky="ew")
         self.btn_cal = tk.Button(bgrid, text="一键校准", command=self._calibrate)
-        self.btn_cal.grid(row=2, column=1, columnspan=2, padx=2, pady=2, sticky="ew")
+        self.btn_cal.grid(row=2, column=2, padx=2, pady=2, sticky="ew")
 
         # ---- 上部参数区(可滚动) ----
         wrap = tk.Frame(right)
@@ -1182,6 +1184,17 @@ class App:
             self.cur[1] = idx
         self._redraw(force=True)
 
+    def _toggle_cursors(self):
+        """一键放置 / 清除两条光标(也可 Shift+左键单独放置)"""
+        n = len(self.samples)
+        if n < 8:
+            return
+        if self.cur[0] is None or self.cur[1] is None:
+            self.cur = [n // 3, (2 * n) // 3]
+        else:
+            self.cur = [None, None]
+        self._redraw(force=True)
+
     def _draw_cursors(self, c, x0, x1):
         if not self.samples:
             return
@@ -1698,6 +1711,10 @@ class App:
                                  fmt_mv(min(mvs)), fmt_mv(max(mvs)),
                                  sp.get("bgv", 0), sp.get("adcbg", 0), sp.get("lsb", 0), tb))
 
+        if self.cur[0] is None or self.cur[1] is None:
+            self.hexlabel.config(text=self._tr("光标: Shift+左键放置 / 拖动移动 / 双击清除（或点「光标」）"))
+        else:
+            self.hexlabel.config(text="")
         self._draw_cursors(c, x0, x1)
         st = self._measure_stats(sp, mvs)
         self.stat = st

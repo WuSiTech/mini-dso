@@ -112,6 +112,8 @@
 
 ### 操作说明 — 上位机（PC）
 
+> 光标：Shift+左键放置 / 拖动移动 / 双击清除，也可以点界面上的「光标」按钮一键放两条。
+
 `py/dso_gui.py` 需要 Python 3 + `pyserial`（画 PNG 需要 `pillow`）：
 
 ```bat

@@ -36,6 +36,7 @@
 static void DrawMarqueeRow(uint8 y, uint8 *str, uint8 offset);
 static void FillRowBand(uint8 y, bit white);
 void PlotCursors(void);
+void PlotCalPage(void);
 
 uint16 *pADCSampling;       /* pointer to live ADC samples */
 uint16 waveBuf[SAMPLE_NUM]; /* mapped waveform data */
@@ -1204,12 +1205,12 @@ void PlotInfoPage(void)
         {
             OLED_DrawCNStr(0, 40, S_Proj);
             OLED_Set_Pos(7 * CN_W + 2, 42);
-            OLED_DrawString("(v1.2)");
+            OLED_DrawString("(v1.3)");
         }
         else
         {
             OLED_Set_Pos(0, 42);
-            OLED_DrawString("PROJ:(v1.2)");
+            OLED_DrawString("PROJ:(v1.3)");
         }
     }
     OLED_Reverse(0);

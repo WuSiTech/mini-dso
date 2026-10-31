@@ -67,6 +67,7 @@ PLOT_MODE_TXT = ["Dots", "Vect"]
 # v1.2 新增: 信号源 15 档频率 / 波形类型 / 语言
 GEN_FREQ_TXT = ["1Hz", "2Hz", "5Hz", "10Hz", "20Hz", "50Hz", "100Hz",
                 "200Hz", "500Hz", "1kHz", "2kHz", "5kHz", "10kHz", "17kHz", "42kHz"]
+WAVE_FREQ_TXT = ["9Hz", "18Hz", "35Hz", "70Hz", "141Hz", "282Hz"]
 WAVE_TYPE_TXT = ["正弦 Sine", "三角 Tri", "锯齿 Saw"]
 LANG_TXT = ["中文", "English"]
 
@@ -101,6 +102,7 @@ TR_C2E = {
     "触发沿": "Trig slope",
     "方波频率": "PWM freq",
     "波形类型": "Wave type",
+    "波形频率": "Wave freq",
     "设备语言": "DSO lang",
     "纵向缩放": "V zoom",
     "自动适配": "Auto-fit",
@@ -627,6 +629,9 @@ class App:
         self.v_outuart = tk.IntVar(value=1)
         self.v_genfreq = tk.IntVar(value=0)
         self.v_genduty = tk.IntVar(value=50)
+        self.v_wavefreq = tk.IntVar(value=2)
+        self.v_wavefreq_txt = tk.StringVar(value=WAVE_FREQ_TXT[2])
+
         self.v_wavetype = tk.IntVar(value=0)
         self.v_lang = tk.IntVar(value=0)
         self.v_genfreq_txt = tk.StringVar(value=GEN_FREQ_TXT[0])
@@ -740,6 +745,12 @@ class App:
         cbw = ttk.Combobox(p, textvariable=self.v_wavetype_txt, values=WAVE_TYPE_TXT,
                            width=9, state="readonly")
         cbw.grid(row=row, column=1, sticky="w")
+        lab("波形频率")
+        cbf = ttk.Combobox(p, textvariable=self.v_wavefreq_txt, values=WAVE_FREQ_TXT,
+                           width=10, state="readonly")
+        cbf.grid(row=row, column=1, sticky="w")
+        cbf.bind("<<ComboboxSelected>>", lambda e: self._schedule_apply())
+        row += 1
         cbw.bind("<<ComboboxSelected>>", lambda e: self._on_enum_change())
         row += 1
 
@@ -954,7 +965,7 @@ class App:
             scaleh=int(self.v_scaleh.get()), scalev_auto=int(self.v_auto.get()),
             rulervmax=int(self.v_vmax.get()), rulervmin=int(self.v_vmin.get()),
             trilevel=int(self.v_tri.get()), trimode=TRI_MODE_TXT.index(self.v_trmode.get()),
-            trislope=int(self.v_slope.get()), wavescroll=0,
+            trislope=int(self.v_slope.get()), wavescroll=int(self.v_wavefreq.get()),
             brightness=int(self.v_brt.get()),
             outpwm=int(self.v_outpwm.get()), outsin=int(self.v_outsin.get()),
             outuart=int(self.v_outuart.get()),
@@ -1034,10 +1045,12 @@ class App:
             self.v_genfreq.set(s.get("genfreq", 0))
             self.v_genduty.set(s.get("genduty", 50))
             self.v_wavetype.set(s.get("wavetype", 0))
+            self.v_wavefreq.set(max(0, min(5, int(s.get("wavescroll", 2)))))
             self.v_lang.set(s.get("lang", 0))
             try:
                 self.v_genfreq_txt.set(GEN_FREQ_TXT[self.v_genfreq.get() % len(GEN_FREQ_TXT)])
                 self.v_wavetype_txt.set(WAVE_TYPE_TXT[self.v_wavetype.get() % len(WAVE_TYPE_TXT)])
+                self.v_wavefreq_txt.set(WAVE_FREQ_TXT[self.v_wavefreq.get() % len(WAVE_FREQ_TXT)])
                 self.v_lang_txt.set(LANG_TXT[1 if self.v_lang.get() else 0])
             except Exception:
                 pass
@@ -1368,7 +1381,7 @@ class App:
                 raise RuntimeError("读取参数失败")
             cur["trimode"] = 0          # 自动触发, 波形稳定
             cur["scalev_auto"] = 1
-            cur["wavescroll"] = 0
+            cur["wavescroll"] = int(self.v_wavefreq.get())
 
             new = list(tbl)
             N = len(SCALE_H_TXT)        # 21

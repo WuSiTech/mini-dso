@@ -29,7 +29,9 @@ bit InSettings;                                            //进入设置界面标志位
 bit PlotMode;                                              //绘图模式 0:Vect 1:Dots
 bit TriSlope;                                              //触发方向，1：上升触发，0：下降触发
 bit TriFail;                                               //触发失败标志位
-bit WaveScroll;                                            //波形滚动标志位
+bit WaveScroll;
+__xdata uint8 WaveFreqIdx = 2;
+uint8 WaveDiv = 32;                                            //波形滚动标志位
 bit WaveUpdate;                                            //更新波形标志位
 bit ScaleV_Auto;                                           //自动量程标志位
 bit ADCComplete;                                           //ADC完成采样，为单次采样服务

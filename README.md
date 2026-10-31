@@ -23,7 +23,7 @@
 - **21 档时基** 500 ms/div … 80 µs/div，逐档实测校准（EEPROM 可软件再校准）
 - **双光标测量**：设备端独立光标页，直接读出 `dT` / `dV`（画在最底行）
 - **可调信号源**：P1.1 方波 15 档频率（≈1 Hz~42 kHz）+ 占空比 1~99 %；
-  P1.0 输出正弦 / 三角 / 锯齿（软件 PWM，64 点/周期 + 抖动分辨率，约 70~80 Hz），板载 **RP1(200K)+L1(1mH)+C3(22nF)**
+  P1.0 输出正弦 / 三角 / 锯齿（1-bit PDM，64 点/周期，**6 档频率 9~282 Hz 可调**），板载 **RP1(200K)+L1(1mH)+C3(22nF)**
   把它滤波成正弦，送到 **SIN 测试环**；RP1 同时就是正弦的幅值调节
 - **中文点阵字库**：12×12 像素风，由 `py/gen_cnfont.py` 自动生成
 - **波形滚动只在暂停时可用**：暂停后按住旋钮把光标切到左下角标尺（选中即反色），
@@ -80,7 +80,7 @@
   此时旋转 = 左右滚动波形；切到其它项就恢复各自调参
 - 双击功能已移除（只用于设置页的"取消修改"，见下）
 
-#### 设置页（14 项）
+#### 设置页（15 项）
 
 旋转 = 改当前项的值；**按住 + 旋转** = 在项目间移动；**长按** = 保存并退出。
 
@@ -90,7 +90,7 @@
 波形输出      波形类型    串口输出
 语言          光标测量 >
 创作者信息 >  校准表 >
-电池电压
+波形频率      电池电压
 ```
 
 - **长按**：保存到 EEPROM，屏幕提示 `保存成功 / 保存失败`
@@ -335,7 +335,7 @@ Settings page: rotate = change value, **press+rotate = move between items**,
 long press = **save to EEPROM and show `Save Success`**,
 **double-click = discard changes** (reloads settings + calibration from EEPROM, shows
 `Changes discarded`, then returns one level up). Double-click only works inside settings.
-14 items:
+15 items:
 `Plot mode, Brightness, LSB, PWM out, PWM freq, Duty, Wave out, Wave type, UART out,
 Language, Cursor >, Dev-er Info >, Cal table >, Batt voltage`.
 Encoder acceleration applies only to the four numeric items (brightness, LSB,

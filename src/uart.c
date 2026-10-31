@@ -190,7 +190,7 @@ uint8 UART_GetSettings(uint8 *s)
     s[10] = (uint8)((uint16)TriLevel >> 8);
     s[11] = (uint8)TriMode;
     s[12] = TriSlope ? 1 : 0;
-    s[13] = WaveScroll ? 1 : 0;
+    s[13] = WaveFreqIdx;
     s[14] = OLED_Brightness;
     s[15] = OutPWM ? 1 : 0;
     s[16] = OutSIN ? 1 : 0;
@@ -221,7 +221,8 @@ void UART_ApplySettings(uint8 *s)
     TriLevel = (int16)((uint16)s[9] | ((uint16)s[10] << 8));
     TriMode = (int8)s[11];
     TriSlope = s[12] ? 1 : 0;
-    WaveScroll = s[13] ? 1 : 0;
+    WaveFreqIdx = s[13] > 5 ? 2 : s[13];
+    WaveFreq_Update();
     OLED_Brightness = s[14];
     OutPWM = s[15] ? 1 : 0;
     OutSIN = s[16] ? 1 : 0;

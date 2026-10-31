@@ -833,7 +833,7 @@ void PWM_Isr(void) __interrupt (TIMER_1)
      (72.1kHz) with a 64-entry table stepped every 16 ticks (~70Hz).
      The on-board RP1 + L1 + C3 network averages the PDM stream, which is
      much smoother than a low-resolution PWM and immune to ISR jitter. */
-  if (++PwmCnt >= 32)
+  if (++PwmCnt >= WaveDiv)
   {
     PwmCnt = 0;
     if (WaveType == 1)

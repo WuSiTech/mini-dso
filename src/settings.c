@@ -28,6 +28,17 @@
 #include "settings.h"
 #include "keys.h"
 
+/* waveform frequency divider: ISR 72.1kHz / div / 64 points -> 8.8/17.6/35/70/141/282 Hz */
+static const uint8 code WaveDivTab[6] = {128, 64, 32, 16, 8, 4};
+
+void WaveFreq_Update(void)
+{
+    if (WaveFreqIdx > 5)
+        WaveFreqIdx = 2;
+    WaveDiv = WaveDivTab[WaveFreqIdx];
+}
+
+
     //单片机速度限制，单次和普通触发的中间计算造成单片机无法完成70us区间计算
     //MCU speed limitation result in the Single Sweep and Normal Sweep calculations could not complete in 70us time interval.
 void Check_MinTimeInterval()
@@ -187,14 +198,14 @@ void change_OptionInSettings(bit i)
     if (i)
     {
         OptionInSettings++;
-        if (OptionInSettings > 13)
+        if (OptionInSettings > 14)
             OptionInSettings = 0;
     }
     else
     {
         OptionInSettings--;
         if (OptionInSettings < 0)
-            OptionInSettings = 13;
+            OptionInSettings = 14;
     }
 }
 
@@ -527,8 +538,27 @@ void Change_Val(bit i)
             ClearDisplay = 1;
             return;
         }
-        /* 13: 电池电压 -> 无操作 */
+        /* 13: 波形频率 (正弦/三角/锯齿): 6 档 */
         else if (OptionInSettings == 13)
+        {
+            if (i)
+            {
+                if (++WaveFreqIdx > 5)
+                    WaveFreqIdx = 0;
+            }
+            else
+            {
+                if (WaveFreqIdx == 0)
+                    WaveFreqIdx = 5;
+                else
+                    WaveFreqIdx--;
+            }
+            WaveDiv = WaveDivTab[WaveFreqIdx];
+            WaveType = WaveType;      /* no-op, keep */
+            DisplayUpdate = 1;
+        }
+        /* 14: 电池电压 -> 无操作 */
+        else if (OptionInSettings == 14)
         {
             DisplayUpdate = 1;
             return;
@@ -684,12 +714,13 @@ static void Load_Defaults(void)
     TriSlope = 1;
     WaveScroll = 0;
     OLED_Brightness = 10;
-    OutPWM = 0;               /* 方波输出: 默认关 */
-    OutSIN = 0;               /* 波形输出: 默认关 */
+    OutPWM = 1;               /* 方波输出: 默认开 */
+    OutSIN = 1;               /* 波形输出: 默认开 */
     OutUART = 1;
     GenFreqIdx = 9;
     GenDuty = 50;
     WaveType = 0;
+    WaveFreqIdx = 2;
     Lang = 1;
 }
 
@@ -713,7 +744,7 @@ bit Save_Options()
     *p++ = TriLevel;
     *p++ = TriMode;
     *p++ = TriSlope;
-    *p++ = WaveScroll;
+    *p++ = WaveFreqIdx;
     *p++ = OLED_Brightness;
     *p++ = OutPWM;
     *p++ = OutSIN;
@@ -786,7 +817,8 @@ void Read_Options()
     TriLevel |= *p++;
     TriMode = *p++;
     TriSlope = *p++;
-    WaveScroll = *p++;
+    WaveFreqIdx = *p++;
+    WaveScroll = 0;
     OLED_Brightness = *p++;
     OutPWM = *p++;
     OutSIN = *p++;
@@ -813,6 +845,9 @@ void Read_Options()
     }
 
     WaveScroll = 0;   /* 旧滚动模式已停用(改用暂停+光标指滚动条) */
+    if (WaveFreqIdx > 5)
+        WaveFreqIdx = 2;
+    WaveDiv = WaveDivTab[WaveFreqIdx];
     EepromValid = ok;   /* cpv - 供开机自检 */
 
     check_Options(); /* 检查选项合法性 */

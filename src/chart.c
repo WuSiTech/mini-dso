@@ -637,7 +637,7 @@ void PlotChart(void)
 
         /* Í¼±íÐéÏßÍø¸ñ
            Grid of chart */
-        for (i = 0; i < 14; i++)
+        for (i = 0; i < 15; i++)
         {
             OLED_DrawHLine(CHART_H_MIN + 7 * i, CHART_V_MIN + ((CHART_V_MAX - CHART_V_MIN) >> 1), 3);
         }
@@ -922,7 +922,7 @@ static void DrawNumRight(uint32 v, uint8 width)
     OLED_DrawNum(v, d);
 }
 
-#define SETT_ITEMS 14
+#define SETT_ITEMS 15
 
 void PlotSettings()
 {
@@ -972,7 +972,7 @@ void PlotSettings()
         else
             scroll = 0;
 
-        for (i = 0; i < 14; i++)
+        for (i = 0; i < 15; i++)
         {
             uint8 hi = ((int8)i == OptionInSettings) ? 1 : 0;
 
@@ -1049,6 +1049,19 @@ void PlotSettings()
                 OLED_DrawString(">");
                 break;
             case 13:
+                OLED_DrawCNStr(0, (uint8)y, S_Scroll);
+                OLED_Set_Pos(3 * CN_W + 2, (uint8)y);
+                switch (WaveFreqIdx)
+                {
+                    case 0: OLED_DrawString("9Hz  "); break;
+                    case 1: OLED_DrawString("18Hz "); break;
+                    case 2: OLED_DrawString("35Hz "); break;
+                    case 3: OLED_DrawString("70Hz "); break;
+                    case 4: OLED_DrawString("141Hz"); break;
+                    default: OLED_DrawString("282Hz"); break;
+                }
+                break;
+            case 14:
                 OLED_DrawCNStr(0, (uint8)y, S_Batt);
                 OLED_Set_Pos(4 * CN_W + 2, (uint8)(y + 2));
                 OLED_DrawString(c_mv_V(VBat));
@@ -1072,7 +1085,7 @@ void PlotSettings()
         for (slot = 0; slot < 8; slot++)
             OLED_ClearRow((uint8)(slot * 8));
 
-        for (i = 0; i < 14; i++)
+        for (i = 0; i < 15; i++)
         {
             uint8 hi = ((int8)i == OptionInSettings) ? 1 : 0;
 
@@ -1103,7 +1116,17 @@ void PlotSettings()
             case 10: OLED_DrawString("Cursor >"); break;
             case 11: OLED_DrawString("Dev-er Info >"); break;
             case 12: OLED_DrawString("Cal table >"); break;
-            case 13: OLED_DrawString("Batt Voltage="); OLED_DrawString(c_mv_V(VBat)); OLED_DrawString("V"); break;
+            case 13: OLED_DrawString("Wave freq=");
+                      switch (WaveFreqIdx) {
+                        case 0: OLED_DrawString("9Hz"); break;
+                        case 1: OLED_DrawString("18Hz"); break;
+                        case 2: OLED_DrawString("35Hz"); break;
+                        case 3: OLED_DrawString("70Hz"); break;
+                        case 4: OLED_DrawString("141Hz"); break;
+                        default: OLED_DrawString("282Hz"); break;
+                      }
+                      break;
+            case 14: OLED_DrawString("Batt Voltage="); OLED_DrawString(c_mv_V(VBat)); OLED_DrawString("V"); break;
             }
             OLED_Reverse(0);
         }

@@ -26,6 +26,7 @@
 */
 
 #include "settings.h"
+#include "keys.h"
 
     //单片机速度限制，单次和普通触发的中间计算造成单片机无法完成70us区间计算
     //MCU speed limitation result in the Single Sweep and Normal Sweep calculations could not complete in 70us time interval.
@@ -184,14 +185,14 @@ void change_OptionInSettings(bit i)
     if (i)
     {
         OptionInSettings++;
-        if (OptionInSettings > 12)
+        if (OptionInSettings > 13)
             OptionInSettings = 0;
     }
     else
     {
         OptionInSettings--;
         if (OptionInSettings < 0)
-            OptionInSettings = 12;
+            OptionInSettings = 13;
     }
 }
 
@@ -277,8 +278,53 @@ void change_OLED_Brightness(bit i)
     OLED_BrightnessChanged = 1;
 }
 
+static uint16 CalLastMs = 0;
+
 void Change_Val(bit i)
 {
+    /* ---------------- 校准表页 ---------------- */
+    if (CalPage)
+    {
+        if (EC11PressAndRotate)
+        {
+            if (i)
+            {
+                if (++CalSel > 20)
+                    CalSel = 0;
+            }
+            else
+            {
+                if (CalSel == 0)
+                    CalSel = 20;
+                else
+                    CalSel--;
+            }
+        }
+        else
+        {
+            uint16 step = 1;
+            if ((uint16)(AppMs - CalLastMs) <= 60)
+                step = 8;
+            CalLastMs = AppMs;
+            if (i)
+            {
+                if (CalTable[CalSel] < 65000)
+                    CalTable[CalSel] += step;
+            }
+            else
+            {
+                if (CalTable[CalSel] >= step)
+                    CalTable[CalSel] -= step;
+                else
+                    CalTable[CalSel] = 0;
+            }
+            OptionChanged = 1;
+        }
+        ClearDisplay = 1;
+        DisplayUpdate = 1;
+        return;
+    }
+
     /* ---------------- 光标测量页 ---------------- */
     if (CursorPage)
     {
@@ -471,8 +517,16 @@ void Change_Val(bit i)
             ClearDisplay = 1;
             return;
         }
-        /* 12: 电池电压 -> 无操作 */
+        /* 12: 校准表 -> 选中后再旋转进入 */
         else if (OptionInSettings == 12)
+        {
+            CalPage = 1;
+            CalSel = 0;
+            ClearDisplay = 1;
+            return;
+        }
+        /* 13: 电池电压 -> 无操作 */
+        else if (OptionInSettings == 13)
         {
             DisplayUpdate = 1;
             return;

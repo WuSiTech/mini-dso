@@ -61,6 +61,8 @@ extern __xdata uint8 WaveType;
 extern __xdata uint8 Lang;
 extern bit InfoPage;
 extern bit CursorPage;
+extern bit CalPage;      /* calibration table page */
+extern uint8 CalSel;     /* current cal index 0..20 */
 /* ---- 新增(CPV 优化) ---- */
 extern __xdata uint8 CurA, CurB;      /* 光标 A/B 位置(0..159) */
 extern bit CurSel;            /* 0=选中 A, 1=选中 B */

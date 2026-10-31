@@ -637,7 +637,7 @@ void PlotChart(void)
 
         /* 图表虚线网格
            Grid of chart */
-        for (i = 0; i < 15; i++)
+        for (i = 0; i < 14; i++)
         {
             OLED_DrawHLine(CHART_H_MIN + 7 * i, CHART_V_MIN + ((CHART_V_MAX - CHART_V_MIN) >> 1), 3);
         }
@@ -908,7 +908,7 @@ static void DrawNumRight(uint32 v, uint8 width)
     OLED_DrawNum(v, d);
 }
 
-#define SETT_ITEMS 13
+#define SETT_ITEMS 14
 
 void PlotSettings()
 {
@@ -919,6 +919,13 @@ void PlotSettings()
     if (CursorPage)
     {
         return;                 /* 光标页由主循环绘制波形+光标 */
+    }
+
+    /* 校准表页 */
+    if (CalPage)
+    {
+        PlotCalPage();
+        return;
     }
 
     /* 进入"创作者信息"页 */
@@ -951,7 +958,7 @@ void PlotSettings()
         else
             scroll = 0;
 
-        for (i = 0; i < 15; i++)
+        for (i = 0; i < 14; i++)
         {
             uint8 hi = ((int8)i == OptionInSettings) ? 1 : 0;
 
@@ -1023,6 +1030,11 @@ void PlotSettings()
                 OLED_DrawString(">");
                 break;
             case 12:
+                OLED_DrawCNStr(0, (uint8)y, S_Cal);
+                OLED_Set_Pos(3 * CN_W + 2, (uint8)(y + 2));
+                OLED_DrawString(">");
+                break;
+            case 13:
                 OLED_DrawCNStr(0, (uint8)y, S_Batt);
                 OLED_Set_Pos(4 * CN_W + 2, (uint8)(y + 2));
                 OLED_DrawString(c_mv_V(VBat));
@@ -1046,7 +1058,7 @@ void PlotSettings()
         for (slot = 0; slot < 8; slot++)
             OLED_ClearRow((uint8)(slot * 8));
 
-        for (i = 0; i < 15; i++)
+        for (i = 0; i < 14; i++)
         {
             uint8 hi = ((int8)i == OptionInSettings) ? 1 : 0;
 
@@ -1076,7 +1088,8 @@ void PlotSettings()
             case 9: OLED_DrawString("Language="); OLED_DrawString(Lang ? "CN" : "EN"); break;
             case 10: OLED_DrawString("Cursor >"); break;
             case 11: OLED_DrawString("Dev-er Info >"); break;
-            case 12: OLED_DrawString("Batt Voltage="); OLED_DrawString(c_mv_V(VBat)); OLED_DrawString("V"); break;
+            case 12: OLED_DrawString("Cal table >"); break;
+            case 13: OLED_DrawString("Batt Voltage="); OLED_DrawString(c_mv_V(VBat)); OLED_DrawString("V"); break;
             }
             OLED_Reverse(0);
         }
@@ -1142,6 +1155,47 @@ static void DrawMarqueeRow(uint8 y, uint8 *str, uint8 offset)
         idx = (uint8)((offset + i) % (len + 3));
         OLED_DrawChar((uint8)(i * 6), y, (idx < len) ? str[idx] : ' ');
     }
+}
+
+/* 校准表页: 显示 5 档校准值, 逐档微调 */
+void PlotCalPage(void)
+{
+    uint8 slot, idx, base;
+    int8 y;
+
+    OLED_Overlap(0);
+    if (ClearDisplay)
+    {
+        ClearDisplay = 0;
+        OLED_Clear();
+    }
+
+    OLED_Set_Pos(2, 0);
+    OLED_DrawString("CAL ");
+    OLED_DrawNum(CalSel, NumDigits(CalSel));
+    OLED_DrawString("/20");
+    OLED_Set_Pos(70, 0);
+    OLED_DrawString_ScaleHTxt((int8)CalSel);
+
+    base = (CalSel > 2) ? (uint8)(CalSel - 2) : 0;
+    for (slot = 0; slot < 5; slot++)
+    {
+        idx = base + slot;
+        if (idx > 20)
+            break;
+        y = (int8)(slot * 12 + 12);
+        if (y > 52)
+            break;
+        FillRowBand((uint8)y, (idx == CalSel) ? 1 : 0);
+        OLED_Reverse((idx == CalSel) ? 1 : 0);
+        OLED_Set_Pos(2, (uint8)(y + 2));
+        OLED_DrawString("#");
+        OLED_DrawNum(idx, NumDigits(idx));
+        OLED_Set_Pos(40, (uint8)(y + 2));
+        OLED_DrawNum(CalTable[idx], 5);
+        OLED_Reverse(0);
+    }
+    OLED_Overlap(1);
 }
 
 /* 创作者信息页: LOGO + 作者/开发(可选中) + 底部 <Back */

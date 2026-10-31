@@ -113,6 +113,15 @@ static void Key_Long(void)
         ADCInterrupt = 1;
         return;
     }
+    if (InSettings && CalPage)
+    {
+        CalPage = 0;
+        OptionChanged = 1;      /* ÕÀ≥ˆ…Ë÷√ ±–¥ EEPROM */
+        ClearDisplay = 1;
+        DisplayUpdate = 1;
+        ADCInterrupt = 1;
+        return;
+    }
     InSettings = !InSettings;
 
     if (InSettings)

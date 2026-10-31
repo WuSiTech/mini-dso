@@ -52,6 +52,8 @@ __xdata uint8 Lang = 0;   /* 0=English 1=жпнд */
 bit InfoPage = 0;
 bit CursorPage = 0;
 __xdata uint8 CurA = 40, CurB = 110;
+bit CalPage = 0;
+uint8 CalSel = 0;
 bit CurSel = 0;
 bit EepromValid = 0;
 bit PostEepromOk = 0, PostCalOk = 0, PostBgvOk = 0;

@@ -46,6 +46,7 @@ T_SETTINGS = 0x03
 T_SET = 0x10
 T_SAVE = 0x11
 T_GET = 0x12
+T_INFO = 0x19       # 固件信息(版本/能力)
 
 BAUD = 115200
 BAUD_CANDIDATES = [115200, 230400, 460800, 921600, 57600, 38400, 19200,
@@ -68,6 +69,74 @@ GEN_FREQ_TXT = ["1Hz", "2Hz", "5Hz", "10Hz", "20Hz", "50Hz", "100Hz",
                 "200Hz", "500Hz", "1kHz", "2kHz", "5kHz", "10kHz", "17kHz", "42kHz"]
 WAVE_TYPE_TXT = ["正弦 Sine", "三角 Tri", "锯齿 Saw"]
 LANG_TXT = ["中文", "English"]
+
+# ---- 界面中英对照(按长度从长到短匹配, 所以长词优先) ----
+TR_C2E = {
+    "已自动识别示波器: ": "Auto-detected scope: ",
+    "点「连接」": "click Connect",
+    "扫描到波特率: ": "Detected baud: ",
+    "校准完成并写入 EEPROM": "Calibration written to EEPROM",
+    "校准写入失败": "Calibration write failed",
+    "正在扫描波特率...": "Scanning baud rates...",
+    "未收到任何数据": "No data received",
+    "保存波形 (CSV)": "Save wave (CSV)",
+    "保存截图 (PNG)": "Save shot (PNG)",
+    "保存设置": "Save EEPROM",
+    "示波器参数（旋转即刻生效）": "Scope parameters (live)",
+    "自动识别失败，请手动选择串口": "Auto-detect failed, pick a port",
+    "演示模式（无硬件）": "Demo mode (no hardware)",
+    "没有波形数据": "No waveform data",
+    "截图已保存": "Screenshot saved",
+    "校准中...": "Calibrating...",
+    "校准失败": "Calibration failed",
+    "串口错误": "Serial error",
+    "已断开": "Disconnected",
+    "已连接": "Connected",
+    "连接失败": "Connect failed",
+    "请选择串口": "Select a port",
+    "一键校准": "Calibrate",
+    "扫描波特率": "Scan bauds",
+    "绘图模式": "Plot mode",
+    "电压量程": "Range",
+    "触发电平": "Trig level",
+    "触发方式": "Trig mode",
+    "触发沿": "Trig slope",
+    "方波频率": "PWM freq",
+    "波形类型": "Wave type",
+    "设备语言": "DSO lang",
+    "纵向缩放": "V zoom",
+    "自动适配": "Auto-fit",
+    "亮度": "Brightness",
+    "时基": "Time base",
+    "占空比": "Duty",
+    "已保存": "Saved",
+    "截图失败": "Screenshot failed",
+    "保存失败": "Save failed",
+    "保存中...": "Saving...",
+    "停止演示": "Stop demo",
+    "演示模式": "Demo mode",
+    "没有数据": "No data",
+    "刷新": "Refresh",
+    "已暂停": "PAUSED",
+    "继续": "Resume",
+    "连接": "Connect",
+    "断开": "Disconnect",
+    "读取": "Read",
+    "暂停": "Pause",
+    "频谱": "FFT",
+    "波形": "Wave",
+    "输出": "Output",
+    "显示": "Display",
+    "上升": "Rise",
+    "下降": "Fall",
+    "点": "Dots",
+    "线": "Vect",
+    "帧": "fr",
+    "校准": "Calibrate",
+}
+TR_E2C = {}
+for _k, _v in TR_C2E.items():
+    TR_E2C.setdefault(_v, _k)
 
 try:
     import serial
@@ -422,6 +491,8 @@ class App:
         root.geometry("1180x680")
 
         self._build_ui()
+        self._translate_widgets(to_en=False)   # 初始中文: Dots/Vect -> 点/线
+        self.root.after(400, self._autodetect_port)  # 启动时自动识别示波器串口
         self.root.after(30, self._tick)
         if demo:
             self._start_demo()
@@ -651,7 +722,120 @@ class App:
                              fg="#a04000", font=("Segoe UI", 9))
         self.hint.pack(fill="x", padx=8)
         if not HAVE_SERIAL:
-            self.hint.config(text="pyserial 未安装：pip install pyserial（或 --demo）")
+            self._hint("pyserial 未安装：pip install pyserial（或 --demo）")
+
+    # ---------------- 中英切换 ----------------
+    def _tr(self, text):
+        """把当前界面语言对应的字符串翻译成另一种"""
+        if not isinstance(text, str):
+            return text
+        table = TR_C2E if self.lang == "en" else TR_E2C
+        for k in sorted(table, key=len, reverse=True):
+            if k in text:
+                text = text.replace(k, table[k])
+        return text
+
+    def _translate_widgets(self, widget=None, to_en=None):
+        if widget is None:
+            widget = self.root
+        if to_en is None:
+            to_en = (self.lang == "en")
+        table = TR_C2E if to_en else TR_E2C
+        keys = sorted(table, key=len, reverse=True)
+        for w in widget.winfo_children():
+            try:
+                cur = w.cget("text")
+            except Exception:
+                cur = None
+            if cur:
+                new = cur
+                for k in keys:
+                    if k in new:
+                        new = new.replace(k, table[k])
+                if new != cur:
+                    try:
+                        w.config(text=new)
+                    except Exception:
+                        pass
+            self._translate_widgets(w, to_en)
+
+    def _status(self, text):
+        self.status.set(self._tr(text))
+
+    def _msg(self, text):
+        self.save_msg.set(self._tr(text))
+
+    def _hint(self, text):
+        self.hint.config(text=self._tr(text))
+
+    def _info(self, text):
+        self.info.config(text=self._tr(text))
+
+    def _stat(self, text):
+        self.stat_lbl.config(text=self._tr(text))
+
+    def _zoom(self, text):
+        self.zoom_lbl.config(text=self._tr(text))
+
+    def _btnconnect(self, text):
+        self.btn_connect.config(text=self._tr(text))
+
+    def _btnpause(self, text):
+        self.btn_pause.config(text=self._tr(text))
+
+    # ---------------- 启动时自动识别示波器 ----------------
+    def _autodetect_port(self):
+        if not HAVE_SERIAL:
+            return
+        def worker():
+            found = None
+            try:
+                ports = [p.device for p in list_ports.comports()]
+            except Exception:
+                ports = []
+            for dev in ports:
+                if found:
+                    break
+                try:
+                    ser = serial.Serial(dev, BAUD, timeout=0.25)
+                except Exception:
+                    continue
+                try:
+                    ser.reset_input_buffer()
+                    ser.write(build_frame(T_INFO))
+                    parser = FrameParser()
+                    deadline = time.time() + 0.6
+                    while time.time() < deadline and not found:
+                        d = ser.read(256)
+                        if not d:
+                            continue
+                        for t, pl in parser.feed(d):
+                            if t in (T_INFO, T_SETTINGS) and len(pl) >= 8:
+                                found = dev
+                                break
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        ser.close()
+                    except Exception:
+                        pass
+            self.rx_queue.put(("autodetect", found))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_autodetect(self, dev):
+        try:
+            self.ports = [p.device for p in list_ports.comports()]
+        except Exception:
+            pass
+        if dev and dev not in self.ports:
+            self.ports.append(dev)
+        self.port_box["values"] = self.ports
+        if dev:
+            self.port_var.set(dev)
+            self._hint(self._tr("已自动识别示波器: %s，点「连接」" % dev))
+        else:
+            self._hint(self._tr("自动识别失败，请手动选择串口"))
 
     def _refresh_ports(self):
         if HAVE_SERIAL:
@@ -664,21 +848,21 @@ class App:
     def _toggle_connect(self):
         if self.demo:
             self._stop_demo()
-            self.status.set("演示模式已停止")
-            self.btn_connect.config(text="连接")
+            self._status("演示模式已停止")
+            self._btnconnect("连接")
             return
         if self.link and self.link.is_alive():
             self.link.close()
             self.link = None
-            self.btn_connect.config(text="连接")
-            self.status.set("已断开")
+            self._btnconnect("连接")
+            self._status("已断开")
             return
         if not HAVE_SERIAL:
-            self.save_msg.set("需要 pyserial: pip install pyserial")
+            self._msg("需要 pyserial: pip install pyserial")
             return
         port = self.port_var.get().strip()
         if not port:
-            self.save_msg.set("请选择串口")
+            self._msg("请选择串口")
             return
         try:
             baud = int(self.baud_var.get())
@@ -689,19 +873,19 @@ class App:
             self.link.open()
         except Exception as exc:
             self.link = None
-            self.save_msg.set("打开失败: %s" % exc)
+            self._msg("打开失败: %s" % exc)
             return
-        self.btn_connect.config(text="断开")
-        self.status.set("已连接 %s @%d" % (port, baud))
-        self.hint.config(text="")
+        self._btnconnect("断开")
+        self._status("已连接 %s @%d" % (port, baud))
+        self._hint("")
         self.root.after(300, self._read_all)
 
     def _start_demo(self):
         self.demo = True
         self.demo_src = DemoSource(self.rx_queue)
         self.demo_src.start()
-        self.status.set("演示模式 (无硬件)")
-        self.btn_connect.config(text="停止演示")
+        self._status("演示模式 (无硬件)")
+        self._btnconnect("停止演示")
 
     def _stop_demo(self):
         if self.demo_src:
@@ -780,7 +964,7 @@ class App:
         self._send(build_frame(T_GET))
 
     def _save(self):
-        self.save_msg.set("保存中...")
+        self._msg("保存中...")
         self.pending_save = time.time()
         self._send(build_frame(T_SAVE))
 
@@ -819,14 +1003,14 @@ class App:
     # ---------------- 暂停 / 保存 ----------------
     def _toggle_pause(self):
         self.paused = not self.paused
-        self.btn_pause.config(text="继续" if self.paused else "暂停")
-        self.status.set(("已暂停" if self.paused else "运行") + "  (接收计数继续)")
+        self._btnpause("继续" if self.paused else "暂停")
+        self._status(("已暂停" if self.paused else "运行") + "  (接收计数继续)")
         self._redraw(force=True)
 
     def _save_wave(self):
         sp = self.last
         if not sp or not self.samples:
-            self.save_msg.set("还没有波形数据")
+            self._msg("还没有波形数据")
             return
         path = filedialog.asksaveasfilename(defaultextension=".csv",
                                             filetypes=[("CSV", "*.csv"), ("All", "*.*")],
@@ -844,9 +1028,9 @@ class App:
                 w.writerow(["index", "time_s", "raw_adc", "voltage_mV"])
                 for i, raw in enumerate(self.samples):
                     w.writerow([i, "%.9g" % (i * dt), raw, "%.3f" % raw_to_mv(sp, raw)])
-            self.save_msg.set("波形已保存: %s" % os.path.basename(path))
+            self._msg("波形已保存: %s" % os.path.basename(path))
         except Exception as exc:
-            self.save_msg.set("保存失败: %s" % exc)
+            self._msg("保存失败: %s" % exc)
 
     def _save_shot(self):
         path = filedialog.asksaveasfilename(defaultextension=".png",
@@ -862,22 +1046,20 @@ class App:
                 w = self.canvas.winfo_width()
                 h = self.canvas.winfo_height()
                 ImageGrab.grab(bbox=(x, y, x + w, y + h)).save(path)
-                self.save_msg.set("截图已保存: %s" % os.path.basename(path))
+                self._msg("截图已保存: %s" % os.path.basename(path))
             else:
                 ps = path + ".ps"
                 self.canvas.postscript(file=ps)
-                self.save_msg.set("未装 pillow，已保存为 %s" % os.path.basename(ps))
+                self._msg("未装 pillow，已保存为 %s" % os.path.basename(ps))
         except Exception as exc:
-            self.save_msg.set("截图失败: %s" % exc)
+            self._msg("截图失败: %s" % exc)
 
 
     # ---------------- 语言 / 视图 ----------------
     def _toggle_lang(self):
-        self.lang = 'en' if self.lang == 'cn' else 'cn'
-        self.btn_lang.config(text=("中文" if self.lang == 'en' else "English"))
-        self.btn_pause.config(text=("Pause" if self.lang == 'en' else "暂停"))
-        self.btn_view.config(text=("FFT" if self.lang == 'en' else "频谱"))
-        self.btn_cal.config(text=("Calibrate" if self.lang == 'en' else "一键校准"))
+        self.lang = "en" if self.lang == "cn" else "cn"
+        self._translate_widgets(to_en=(self.lang == "en"))
+        self.btn_lang.config(text=("中文" if self.lang == "en" else "English"))
         self._redraw(force=True)
 
     def _toggle_view(self):
@@ -1046,15 +1228,15 @@ class App:
         if self.cal_busy:
             return
         if self.demo:
-            self.save_msg.set("演示模式不能校准")
+            self._msg("演示模式不能校准")
             return
         port = self.port_var.get().strip()
         if not port:
-            self.save_msg.set("先选择串口")
+            self._msg("先选择串口")
             return
         self.cal_busy = True
         self.btn_cal.config(state="disabled")
-        self.save_msg.set("校准中... (约 3~5 分钟)")
+        self._msg("校准中... (约 3~5 分钟)")
         try:
             baud = int(self.baud_var.get() or 115200)
         except Exception:
@@ -1159,14 +1341,14 @@ class App:
         if self.demo or self.scanning:
             return
         if not HAVE_SERIAL:
-            self.hint.config(text="需要 pyserial")
+            self._hint("需要 pyserial")
             return
         port = self.port_var.get().strip()
         if not port:
-            self.hint.config(text="先选择串口")
+            self._hint("先选择串口")
             return
         self.scanning = True
-        self.hint.config(text="正在扫描波特率...")
+        self._hint("正在扫描波特率...")
         threading.Thread(target=self._scan_worker, args=(port,), daemon=True).start()
 
     def _scan_worker(self, port):
@@ -1212,43 +1394,45 @@ class App:
             if kind == "frame":
                 self._on_frame(*data)
             elif kind == "error":
-                self.status.set("串口错误: %s" % data)
+                self._status("串口错误: %s" % data)
                 if self.link:
                     self.link.close()
                     self.link = None
-                self.btn_connect.config(text="连接")
+                self._btnconnect("连接")
             elif kind == "cal_progress":
-                self.save_msg.set(str(data))
+                self._msg(str(data))
             elif kind == "cal_done":
                 ok, tbl = data
                 self.cal_busy = False
                 self.btn_cal.config(state="normal")
-                self.save_msg.set("校准完成并已写入 EEPROM" if ok else "校准写入失败")
-                self.hint.config(text="校准表: " + ",".join(str(v) for v in tbl))
+                self._msg("校准完成并已写入 EEPROM" if ok else "校准写入失败")
+                self._hint("校准表: " + ",".join(str(v) for v in tbl))
                 self.root.after(500, self._toggle_connect)  # 自动重连
             elif kind == "cal_fail":
                 self.cal_busy = False
                 self.btn_cal.config(state="normal")
-                self.save_msg.set("校准失败: " + str(data))
-            elif kind == "scan_done":
+                self._msg("校准失败: " + str(data))
+            elif kind == "autodetect":
+                self._on_autodetect(data)
+            elif kind == scan_done:
                 self.scanning = False
                 if data:
                     self.baud_var.set(str(data))
-                    self.hint.config(text="扫描到波特率 %d，请点连接" % data)
+                    self._hint("扫描到波特率 %d，请点连接" % data)
                 else:
-                    self.hint.config(text="所有候选波特率都收不到有效帧：检查固件/UART版、TXD-RXD 交叉、共地、Output UART=ON")
+                    self._hint("所有候选波特率都收不到有效帧：检查固件/UART版、TXD-RXD 交叉、共地、Output UART=ON")
 
         now = time.time()
         if self.pending_save and now - self.pending_save > 1.5:
             self.pending_save = 0.0
-            self.save_msg.set("Save failed! (超时无应答)")
+            self._msg("Save failed! (超时无应答)")
         if self.pending_get and now - self.pending_get > 1.5:
             self.pending_get = 0.0
             if self.link:
                 if self.link.rx_bytes == 0:
-                    self.hint.config(text="未收到任何数据：确认固件已烧录、TXD/RXD 交叉、共地、Output UART=ON")
+                    self._hint("未收到任何数据：确认固件已烧录、TXD/RXD 交叉、共地、Output UART=ON")
                 else:
-                    self.hint.config(text="收到 %d 字节但没有有效帧：波特率可能不对，点“扫描波特率”"
+                    self._hint("收到 %d 字节但没有有效帧：波特率可能不对，点“扫描波特率”"
                                           % self.link.rx_bytes)
 
         self._redraw()
@@ -1263,7 +1447,7 @@ class App:
         txt = "已连接 %s @%s   RX=%d B  帧=%d" % (self.link.port, self.baud_var.get(), rx, nf)
         if self.paused:
             txt += "   [已暂停]"
-        self.status.set(txt)
+        self._status(txt)
 
     def _on_frame(self, type_, payload):
         if type_ == T_SAMPLE:
@@ -1274,13 +1458,13 @@ class App:
         elif type_ == T_ACK:
             if len(payload) >= 2 and self.pending_save:
                 self.pending_save = 0.0
-                self.save_msg.set("Save succeed" if payload[1] else "Save failed!")
-                self.hint.config(text="")
+                self._msg("Save succeed" if payload[1] else "Save failed!")
+                self._hint("")
         elif type_ == T_SETTINGS:
             if len(payload) >= SETTINGS_LEN:
                 self._apply_settings_to_ui(settings_from_bytes(payload))
                 self.pending_get = 0.0
-                self.hint.config(text="")
+                self._hint("")
 
     # ---------------- 绘图 ----------------
     # ---------------- 缩放/平移 ----------------
@@ -1389,7 +1573,7 @@ class App:
             center = (rvmin + rvmax) / 2.0
         lo = center - vspan / 2.0
         hi = center + vspan / 2.0
-        self.zoom_lbl.config(text="显示 %s ~ %s   (%.2fx)" % (fmt_mv(lo), fmt_mv(hi), zoom))
+        self._zoom("显示 %s ~ %s   (%.2fx)" % (fmt_mv(lo), fmt_mv(hi), zoom))
 
         def y_of_mv(mv):
             return y1 - (mv - lo) / (hi - lo) * (y1 - y0)
@@ -1462,7 +1646,7 @@ class App:
             tb = "周期=%d 样本  名义=%.1f  时基偏差 %+.1f%%" % (per, nom_samples, (ratio - 1) * 100.0)
         else:
             tb = "周期样本不足/波形不稳，换快一点的时基再测"
-        self.info.config(text="采样点: %d  频率: %.1f Hz\nADC %d..%d -> %s..%s\nBGV=%dmV ADCbg=%d LSB=%d\n%s"
+        self._info("采样点: %d  频率: %.1f Hz\nADC %d..%d -> %s..%s\nBGV=%dmV ADCbg=%d LSB=%d\n%s"
                               % (n, sp["freq"], rawmin, rawmax,
                                  fmt_mv(min(mvs)), fmt_mv(max(mvs)),
                                  sp.get("bgv", 0), sp.get("adcbg", 0), sp.get("lsb", 0), tb))
@@ -1476,7 +1660,7 @@ class App:
             dti = abs(self.cur[1] - self.cur[0]) * dt
             dv = abs(mvs[self.cur[1]] - mvs[self.cur[0]])
             cur_txt = "\nC1-C2: Δt=%s  ΔV=%s" % (fmt_time(dti), fmt_mv(dv))
-        self.stat_lbl.config(text="Vpp=%s  Vmax=%s  Vmin=%s\nVrms=%s  Vavg=%s\nF=%s  Duty=%s  Tr=%s%s"
+        self._stat("Vpp=%s  Vmax=%s  Vmin=%s\nVrms=%s  Vavg=%s\nF=%s  Duty=%s  Tr=%s%s"
                              % (fmt_mv(st.get('vpp', 0)), fmt_mv(st.get('vmax', 0)), fmt_mv(st.get('vmin', 0)),
                                 fmt_mv(st.get('rms', 0)), fmt_mv(st.get('mean', 0)),
                                 ("%.1fHz" % st['freq']) if st.get('freq') else "--",

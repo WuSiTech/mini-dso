@@ -36,6 +36,7 @@
 - 原作：**CreativeLau** — https://github.com/CreativeLau/Mini-DSO
 - 适配到 56DZ 版：https://www.elektormagazine.de/labs/reverse-project-mini-oscilloscope
 - 进一步开发：**WuSi & DeepSeek** — https://github.com/WuSiTech/mini-dso
+- 博客介绍（项目过程、功能与踩坑记录）：https://wstek.win/posts/minidso-modify/
 
 ### 硬件
 
@@ -295,6 +296,7 @@ plus further development.
 - Original: **CreativeLau** — https://github.com/CreativeLau/Mini-DSO
 - 56DZ adaptation: https://www.elektormagazine.de/labs/reverse-project-mini-oscilloscope
 - Further development: **WuSi & DeepSeek** — https://github.com/WuSiTech/mini-dso
+- Blog post (Chinese, project story & lessons learned): https://wstek.win/posts/minidso-modify/
 
 ### Controls (device)
 

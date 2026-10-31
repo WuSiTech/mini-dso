@@ -578,13 +578,13 @@ class App:
         main = tk.Frame(self.root)
         main.pack(fill="both", expand=True)
 
-        # ================= 程序最底端: 文字信息条 =================
-        self.textbar = tk.Frame(main, bd=1, relief="sunken")
-        self.textbar.pack(side="bottom", fill="x", padx=4, pady=(2, 4))
-
         # ================= 左侧: 波形 =================
         left = tk.Frame(main)
         left.pack(side="left", fill="both", expand=True, padx=(6, 0))
+
+        # ================= 左栏最底端: 文字信息条 =================
+        self.textbar = tk.Frame(left, bd=1, relief="sunken")
+        self.textbar.pack(side="bottom", fill="x", pady=(2, 2))
 
         self.status = tk.StringVar(value="未连接")
         tk.Label(left, textvariable=self.status, anchor="w",
@@ -642,7 +642,7 @@ class App:
         # ---- 按钮区: 按功能分组, 校准类做成"两级" ----
         def srow(text):
             f = tk.Frame(bot)
-            f.pack(fill="x", pady=(4, 0))
+            f.pack(fill="x", pady=(2, 0))
             tk.Label(f, text=text, anchor="w", fg="#555",
                      font=("Segoe UI", 8, "bold")).pack(side="top", anchor="w", padx=4)
             g = tk.Frame(f)
@@ -653,7 +653,7 @@ class App:
             for i, (txt, cb) in enumerate(specs):
                 parent.columnconfigure(i, weight=1, uniform="b%d" % i)
                 tk.Button(parent, text=txt, command=cb).grid(
-                    row=0, column=i, padx=2, pady=1, sticky="ew")
+                    row=0, column=i, padx=2, pady=0, sticky="ew")
 
         f = srow("运行")
         self.btn_pause = tk.Button(f, text="暂停", command=self._toggle_pause)
@@ -723,7 +723,7 @@ class App:
 
         # --- 连接 ---
         box = tk.LabelFrame(panel, text="连接")
-        box.pack(fill="x", padx=2, pady=3)
+        box.pack(fill="x", padx=2, pady=1)
         self.port_var = tk.StringVar(value="")
         self.ports = [p.device for p in list_ports.comports()] if (HAVE_SERIAL and list_ports) else []
         self.port_box = ttk.Combobox(box, textvariable=self.port_var, values=self.ports, width=7)
@@ -737,7 +737,7 @@ class App:
 
         # --- 示波器参数 ---
         p = tk.LabelFrame(panel, text="示波器参数（旋转即刻生效）")
-        p.pack(fill="x", padx=2, pady=3)
+        p.pack(fill="x", padx=2, pady=1)
         p.columnconfigure(1, weight=1)
         row = 0
 
@@ -890,7 +890,7 @@ class App:
 
         # --- 显示 ---
         d = tk.LabelFrame(panel, text="显示")
-        d.pack(fill="x", padx=2, pady=3)
+        d.pack(fill="x", padx=2, pady=1)
         d.columnconfigure(1, weight=1)
         tk.Label(d, text="纵向缩放").grid(row=0, column=0, sticky="w", padx=3)
         f = tk.Frame(d)

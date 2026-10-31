@@ -58,13 +58,13 @@ def writeoff(vals):
 
 
 def picktb(period_us, dt):
-    want = period_us / 150.0 * 100.0
+    want = period_us / 40.0 * 100.0
     best, bd = 9, 1e18
     for i in range(21):
         v = dt[i]
         if v <= 0:
             continue
-        if 220.0 * v < 6.0 * period_us * 100.0:
+        if 220.0 * v < 3.0 * period_us * 100.0:
             continue
         dd = abs(v - want)
         if dd < bd:

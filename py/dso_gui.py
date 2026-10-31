@@ -578,6 +578,10 @@ class App:
         main = tk.Frame(self.root)
         main.pack(fill="both", expand=True)
 
+        # ================= 程序最底端: 文字信息条 =================
+        self.textbar = tk.Frame(main, bd=1, relief="sunken")
+        self.textbar.pack(side="bottom", fill="x", padx=4, pady=(2, 4))
+
         # ================= 左侧: 波形 =================
         left = tk.Frame(main)
         left.pack(side="left", fill="both", expand=True, padx=(6, 0))
@@ -622,15 +626,16 @@ class App:
         bot.pack(side="bottom", fill="x", padx=6, pady=(2, 4))
 
         self.save_msg = tk.StringVar(value="")
-        tk.Label(bot, textvariable=self.save_msg, fg="green", anchor="w",
+        tk.Label(self.textbar, textvariable=self.save_msg, fg="green", anchor="w",
                  font=("Segoe UI", 10, "bold")).pack(fill="x")
-        self.hint = tk.Label(bot, text="", anchor="w", justify="left", wraplength=352,
+        self.hint = tk.Label(self.textbar, text="", anchor="w", justify="left",
                              fg="#a04000", font=("Segoe UI", 9))
         self.hint.pack(fill="x")
-        self.stat_lbl = tk.Label(bot, text="", anchor="w", justify="left",
+        self.stat_lbl = tk.Label(self.textbar, text="", anchor="w", justify="left",
                                  font=("Consolas", 9), fg="#0a6")
         self.stat_lbl.pack(fill="x")
-        self.info = tk.Label(bot, text="", anchor="w", justify="left", font=("Consolas", 9))
+        self.info = tk.Label(self.textbar, text="", anchor="w", justify="left",
+                             font=("Consolas", 9))
         self.info.pack(fill="x")
 
         # ---- 按钮网格 (3 列 x 3 行, 单独一个 Frame 用 grid) ----
@@ -695,6 +700,10 @@ class App:
         self.btn_wvcal.grid(row=0, column=2, padx=2, pady=1, sticky="ew")
         for i in range(3):
             f.columnconfigure(i, weight=1, uniform="aud")
+
+        # 文字条换行宽度跟随窗口宽度
+        self.textbar.bind("<Configure>",
+                          lambda e: self.hint.config(wraplength=max(200, e.width - 16)))
 
         self._add_tips()
 

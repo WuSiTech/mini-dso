@@ -1235,10 +1235,18 @@ class App:
         bar.pack(fill="x", padx=6, pady=6)
         tk.Button(bar, text=self._tr("读取"), command=self._outcal_read).pack(side="left", padx=3)
         tk.Button(bar, text=self._tr("写入 EEPROM"), command=self._outcal_write).pack(side="left", padx=3)
-        tk.Button(bar, text=self._tr("声卡校准(方波)"),
-                  command=lambda: self._audio_calibrate("sq")).pack(side="left", padx=3)
-        tk.Button(bar, text=self._tr("声卡校准(波形)"),
-                  command=lambda: self._audio_calibrate("wv")).pack(side="left", padx=3)
+        b_sq = tk.Button(bar, text=self._tr("声卡校准(方波)"),
+                         command=lambda: self._audio_calibrate("sq"))
+        b_sq.pack(side="left", padx=3)
+        _Tip(b_sq, (lambda: "接线：PWM 环 → 声卡 Line-in/Mic（100k+1k 分压到约 100mV，GND 共地）"
+                    if self.lang == "cn" else
+                    "Wiring: PWM loop -> sound-card in via 100k+1k divider, common GND"))
+        b_wv = tk.Button(bar, text=self._tr("声卡校准(波形)"),
+                         command=lambda: self._audio_calibrate("wv"))
+        b_wv.pack(side="left", padx=3)
+        _Tip(b_wv, (lambda: "接线：SIN 环 → 声卡 Line-in/Mic（100k+1k 分压到约 100mV，GND 共地）"
+                    if self.lang == "cn" else
+                    "Wiring: SIN loop -> sound-card in via 100k+1k divider, common GND"))
         b_close = tk.Button(bar, text=self._tr("关闭"), command=self._outcal_close)
         b_close.pack(side="right", padx=3)
         _Tip(b_close, (lambda: "关闭本窗口（不写设备）" if self.lang == "cn" else "Close this dialog (no write)"))
@@ -1541,12 +1549,31 @@ class App:
                             "Time-base self calibration: the device generates its own reference square wave\nand rewrites the 21 ranges (self-consistent, ~1-2 min)")),
             (self.btn_outcal, ("打开输出波偏移表：21 个值 = 方波 15 档 + 波形 6 档\n可读取 / 写入 EEPROM，也可在这里启动声卡校准",
                                "Output frequency offset table: 21 values (15 square + 6 wave)\nRead/write EEPROM, or start audio calibration here")),
-            (self.btn_tbcal, ("声卡校时基（绝对基准）：电脑耳机播放 1 kHz 到示波器 INPUT，\n按声卡晶振测出时基误差并缩放全部 21 档，需要接线",
-                              "Audio time-base calibration (absolute): play 1 kHz from the PC headphone output into the DSO INPUT,\nthen scale all 21 ranges — requires a cable")),
-            (self.btn_sqcal, ("声卡校方波输出：把 PWM 环经分压接到声卡输入，自动测频并回写方波 15 档偏移",
-                              "Audio calibration of the square output: wire the PWM loop to the sound-card input")),
-            (self.btn_wvcal, ("声卡校波形输出：把 SIN 环经分压接到声卡输入，自动测频并回写波形 6 档偏移",
-                              "Audio calibration of the sine/tri/saw output: wire the SIN loop to the sound-card input")),
+            (self.btn_tbcal, ("声卡校时基（绝对基准）\n"
+                               "接线：3.5mm 音频线 电脑耳机口 → 示波器 INPUT\n"
+                               "　红夹接 INPUT 的 Signal，黑夹接 GND\n"
+                               "程序自动播放 1 kHz，按声卡晶振测出时基误差并缩放全部 21 档\n"
+                               "校完后示波器频率读数就是绝对值，可用夹子线自测输出波",
+                               "Audio time-base cal (absolute)\n"
+                               "Wiring: 3.5mm cable, PC headphone out -> DSO INPUT\n"
+                               "　red clip to Signal, black clip to GND\n"
+                               "Plays 1 kHz automatically, scales all 21 ranges to the sound-card clock")),
+            (self.btn_sqcal, ("声卡校方波输出\n"
+                               "接线：PWM 环 → 声卡 Line-in/Mic，中间串分压\n"
+                               "　100k + 1k（或 10k + 220Ω）降到约 100 mV，GND 必须共地\n"
+                               "程序逐档测频并回写方波 15 档偏移",
+                               "Audio cal of the square output\n"
+                               "Wiring: PWM loop -> sound-card Line-in/Mic through a divider\n"
+                               "　100k + 1k (or 10k + 220R) down to ~100 mV, GND common\n"
+                               "Measures each of the 15 steps and writes the offsets")),
+            (self.btn_wvcal, ("声卡校波形输出\n"
+                               "接线：SIN 环 → 声卡 Line-in/Mic，中间串分压\n"
+                               "　100k + 1k（或 10k + 220Ω）降到约 100 mV，GND 必须共地\n"
+                               "程序逐档测频并回写波形 6 档偏移",
+                               "Audio cal of the sine/tri/saw output\n"
+                               "Wiring: SIN loop -> sound-card Line-in/Mic through a divider\n"
+                               "　100k + 1k (or 10k + 220R) down to ~100 mV, GND common\n"
+                               "Measures each of the 6 steps and writes the offsets")),
         ]
         for w, t in tips:
             if w is not None:

@@ -164,19 +164,19 @@ void change_TriPosOffset(bit i)
 
 void change_OptionInChart(bit i)
 {
+    int8 maxopt = ADCRunning ? 4 : 5;   /* 暂停时多一个"滚动位置" */
+
     if (i)
     {
         OptionInChart++;
-
-        if (OptionInChart > 4)
+        if (OptionInChart > maxopt)
             OptionInChart = 0;
     }
     else
     {
         OptionInChart--;
-
         if (OptionInChart < 0)
-            OptionInChart = 4;
+            OptionInChart = maxopt;
     }
 }
 
@@ -551,9 +551,16 @@ void Change_Val(bit i)
        Rotate Encoder in Main interface */
     else
     {
+        /* 滚动位置: 左右滚动波形(仅暂停时可选) */
+        if (OptionInChart == 5)
+        {
+            change_TriPosOffset(i);
+            WaveUpdate = 1;
+            DisplayUpdate = 1;
+        }
         /* 调节时间区间
            Adjust time scale */
-        if (OptionInChart == 0)
+        else if (OptionInChart == 0)
         {
             change_ScaleH(i);
             WaveUpdate = 1;

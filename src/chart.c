@@ -653,6 +653,12 @@ void PlotChart(void)
         OLED_DrawHLine(0, 62, 25);
         OLED_DrawVLine(0, 60, 3);
         OLED_DrawVLine(24, 60, 3);
+        if (OptionInChart == 5)
+    {
+        OLED_DrawVLine((TriPos + TriPosOffset - 50) * 24 / 119, 58, 4);
+        OLED_Reverse(0);
+    }
+    else
         OLED_DrawVLine((TriPos + TriPosOffset - 50) * 24 / 119, 58, 4);
 
         /* ≤®–ŒµÁ—π∑∂Œß

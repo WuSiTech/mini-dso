@@ -14,7 +14,7 @@ STRINGS = {
     'S_Sine': '正弦', 'S_Tri': '三角', 'S_Saw': '锯齿',
     'S_Cn': '中文', 'S_En': '英文',
     'S_SaveOk': '保存成功', 'S_SaveFail': '保存失败',
-    'S_Cancel': '已取消修改',
+    'S_Cancel': '已取消修改', 'S_Scroll': '滚动模式',
 }
 chars = []
 for t in STRINGS.values():

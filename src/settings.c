@@ -1172,7 +1172,7 @@ void SetGenParams(void)
             tot = 100;
         p10 = (uint32)tot;
     }
-    tick = GEN_TICK_US10;        /* 1 tick = GEN_TICK_US10/10 us */
+    tick = (GenTickCal ? GenTickCal : 120);   /* Q8 generator tick (0.1us) */
     pre = 1;
     while ((p10 / ((GenTickCal ? GenTickCal : 120) * pre)) > 60000UL && pre < 128)
         pre <<= 1;
@@ -1188,6 +1188,13 @@ void SetGenParams(void)
     if (k >= GenPeriod)
         k = GenPeriod - 1;
     GenHigh = k;
+    /* Q8 accumulator values for the square generator */
+    GenPerQ = (uint32)((p10 * 256UL) / tick);
+    if (GenPerQ < 512UL)
+        GenPerQ = 512UL;
+    GenHighQ = (uint32)((GenPerQ * (uint32)GenDuty) / 100UL);
+    if (GenHighQ >= GenPerQ)
+        GenHighQ = GenPerQ - 1UL;
 }
 
 

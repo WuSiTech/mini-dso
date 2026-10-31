@@ -42,6 +42,7 @@ __xdata uint16 DtThr = 300;
 __xdata uint16 GenTickCal = 120;
 __xdata uint16 WaveStepCal[6] = {17760, 8880, 4440, 2220, 1110, 555};
 __xdata uint32 DtTbl[21];
+__xdata uint32 GenPerQ = 0, GenHighQ = 0;
 bit OutCalPage = 0;
 uint8 OutCalSel = 0;                                            //波形滚动标志位
 bit WaveUpdate;                                            //更新波形标志位

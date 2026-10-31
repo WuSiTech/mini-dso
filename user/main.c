@@ -815,8 +815,7 @@ void PWM_Isr(void) __interrupt (TIMER_1)
   static __data uint16 Acc = 0;       /* PDM accumulator */
   bit PdmBit = 0;
   static uint16 TestCnt = 0;
-  static uint8 GenPreCnt = 0;
-  static uint16 GenCnt = 0;
+  static __xdata uint32 GenPhase = 0;
 
   /* 校准模式: P1.1 输出 TestDiv 分频的慢速方波(10Hz/2Hz 等) */
   if (TestDiv)
@@ -856,18 +855,18 @@ void PWM_Isr(void) __interrupt (TIMER_1)
     PdmBit = 0;
   P10 = (OutSIN && PdmBit) ? 1 : 0;
 
-  if (OutPWM)
+  if (OutPWM && GenPerQ)
   {
-    if (++GenPreCnt >= GenPre)
-    {
-      GenPreCnt = 0;
-      if (++GenCnt >= GenPeriod)
-        GenCnt = 0;
-      PWM1_OUT = (GenCnt < GenHigh) ? 1 : 0;
-    }
+    GenPhase += 256;            /* Q8 tick accumulator */
+    if (GenPhase >= GenPerQ)
+      GenPhase -= GenPerQ;
+    PWM1_OUT = (GenPhase < GenHighQ) ? 1 : 0;
   }
   else
+  {
     PWM1_OUT = 0;
+    GenPhase = 0;
+  }
 }
 
 // 45.000MHz: PCA 8-bit PWM 载波 175.8kHz, Timer1 中断 72.1kHz -> 正弦/方波 9.01kHz

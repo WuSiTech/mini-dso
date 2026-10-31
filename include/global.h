@@ -49,7 +49,8 @@ extern uint16 WaveStepQ[6];
 extern __xdata uint16 DtA1, DtB1, DtA2, DtB2, DtThr;
 extern __xdata uint16 GenTickCal;      /* 0.1us, 默认 120 */
 extern __xdata uint16 WaveStepCal[6];
-extern __xdata uint32 DtTbl[21];   /* measured sample interval, 0.01us */
+extern __xdata uint32 DtTbl[21];
+extern __xdata uint32 GenPerQ, GenHighQ;   /* measured sample interval, 0.01us */
 void DtTbl_Defaults(void);  /* 每步标称周期 0.1us */  /* delay model (EEPROM) */       /* precomputed step period in Q8 ticks */             /* ISR 分频(由 WaveFreqIdx 换算) */
 extern bit WaveUpdate;
 extern bit ScaleV_Auto;

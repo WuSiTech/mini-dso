@@ -34,11 +34,14 @@ static void Key_DoubleSettings(void);
 /* ---------------- 按键 ---------------- */
 void Key_Isr(void)
 {
-    KeyDown = 1;
-    KeyLongFired = 0;
-    KeyRotated = 0;
-    KeyDownMs = AppMs;
-    ADCInterrupt = 1;       /* 按下立即中止当前扫描 */
+    if (!KeyDown)
+    {
+        KeyDown = 1;
+        KeyDownMs = AppMs;   /* 只有真正的"按下沿"才重置计时(抖动不算) */
+        KeyLongFired = 0;
+        KeyRotated = 0;
+    }
+    ADCInterrupt = 1;        /* 按下立即中止当前扫描 */
 }
 
 void Key_NoteRotate(void)
@@ -197,8 +200,11 @@ static void Key_Single(void)
     ADCRunning = !ADCRunning;
     if (ADCRunning)
     {
-        WaveUpdate = 1;
-        ClearWave = 1;
+        /* 恢复: 保留旧波形不清屏(慢时基一轮 4.4s, 空白会以为没反应),
+           状态栏立即变成 Run, 扫描完成后再刷新波形 */
+        WaveUpdate = 0;
+        ClearWave = 0;
+        DisplayUpdate = 1;
     }
     else
     {

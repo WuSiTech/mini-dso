@@ -1469,7 +1469,7 @@ class App:
                 self._msg("校准失败: " + str(data))
             elif kind == "autodetect":
                 self._on_autodetect(data)
-            elif kind == scan_done:
+            elif kind == "scan_done":
                 self.scanning = False
                 if data:
                     self.baud_var.set(str(data))

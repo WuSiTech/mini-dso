@@ -72,6 +72,11 @@ PLOT_MODE_TXT = ["Dots", "Vect"]
 # v1.2 新增: 信号源 15 档频率 / 波形类型 / 语言
 GEN_FREQ_TXT = ["1Hz", "2Hz", "5Hz", "10Hz", "20Hz", "50Hz", "100Hz",
                 "200Hz", "500Hz", "1kHz", "2kHz", "5kHz", "10kHz", "17kHz", "42kHz"]
+SQ_FREQ_HZ = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 18000, 42000]
+SQ_NOM_US10 = [10000000, 5000000, 2000000, 1000000, 500000, 200000, 100000, 50000, 20000,
+               10000, 5000, 2000, 1000, 555, 238]
+WV_FREQ_HZ = [8.8, 17.6, 35.2, 70.4, 140.8, 281.6]
+WV_NOM_US10 = [17760, 8880, 4440, 2220, 1110, 555]
 WAVE_FREQ_TXT = ["9Hz", "18Hz", "35Hz", "70Hz", "141Hz", "282Hz"]
 WAVE_TYPE_TXT = ["正弦 Sine", "三角 Tri", "锯齿 Saw"]
 LANG_TXT = ["中文", "English"]
@@ -850,6 +855,8 @@ class App:
     def _autodetect_port(self):
         if not HAVE_SERIAL:
             return
+        settings0 = self._collect()   # 主线程先取参数快照(子线程不能碰 Tk)
+
         def worker():
             found = None
             try:
@@ -1125,6 +1132,10 @@ class App:
         bar.pack(fill="x", padx=6, pady=6)
         tk.Button(bar, text=self._tr("读取"), command=self._outcal_read).pack(side="left", padx=3)
         tk.Button(bar, text=self._tr("写入 EEPROM"), command=self._outcal_write).pack(side="left", padx=3)
+        tk.Button(bar, text=self._tr("声卡校准(方波)"),
+                  command=lambda: self._audio_calibrate("sq")).pack(side="left", padx=3)
+        tk.Button(bar, text=self._tr("声卡校准(波形)"),
+                  command=lambda: self._audio_calibrate("wv")).pack(side="left", padx=3)
         tk.Button(bar, text=self._tr("关闭"), command=self._outcal_close).pack(side="right", padx=3)
 
     def _outcal_close(self):
@@ -1145,6 +1156,132 @@ class App:
         pay = b"".join(struct.pack("<h", max(-32768, min(32767, x))) for x in vals)
         self._send(build_frame(int(T_OUTW), pay))
         self._msg("输出波偏移表已写入")
+
+    # ---------------- 声卡频率校准(绝对基准) ----------------
+    @staticmethod
+    def _audio_measure(sec=1.2, fs=48000):
+        """录音并估计基频: 上升沿过零 + 线性插值, 返回 Hz(测不到返回 0)"""
+        import numpy as np
+        import sounddevice as sd
+
+        n = int(fs * sec)
+        rec = sd.rec(n, samplerate=fs, channels=1, dtype="float32")
+        sd.wait()
+        x = np.asarray(rec, dtype=np.float64).reshape(-1)
+        if x.size < fs // 4:
+            return 0.0
+        x = x - x.mean()
+        peak = float(np.max(np.abs(x)))
+        if peak < 1e-4:
+            return 0.0
+        x = x / peak
+        hi, lo = 0.5, -0.5          # 迟滞阈值, 抑制噪声抖动
+        armed = False
+        cross = []
+        for i in range(1, x.size):
+            if not armed and x[i] < lo:
+                armed = True
+            elif armed and x[i] > hi:
+                armed = False
+                a, b = x[i - 1], x[i]      # 线性插值过零点
+                if b != a:
+                    cross.append(i - 1 + (-a) / (b - a))
+        if len(cross) < 3:
+            return 0.0
+        span = cross[-1] - cross[0]
+        if span <= 0:
+            return 0.0
+        return (len(cross) - 1) * fs / span
+
+    def _tmsg(self, text):
+        """子线程里安全地发提示(主线程 _tick 取)"""
+        try:
+            self.rx_queue.put(("msg", text))
+        except Exception:
+            pass
+
+    def _audio_calibrate(self, group):
+        """group: 'sq'(方波15档) / 'wv'(波形6档); 需 P1.1 或 SIN 已接声卡输入"""
+        if not (self.link and not self.demo):
+            self._tmsg(self._tr("请先连接设备"))
+            return
+        try:
+            import sounddevice  # noqa: F401
+            import numpy  # noqa: F401
+        except Exception:
+            self._tmsg("需要 sounddevice + numpy: pip install sounddevice numpy")
+            return
+
+        import threading
+        settings0 = self._collect()   # 主线程取快照(子线程不能碰 Tk)
+
+        def worker():
+            try:
+                base = self._read_out_off()
+                if base is None:
+                    self._tmsg(self._tr("读取偏移表失败"))
+                    return
+                nom = (SQ_NOM_US10 if group == "sq" else WV_NOM_US10)
+                first = 0 if group == "sq" else 15
+                cnt = len(nom)
+                measured = 0
+                cur = dict(settings0)
+                for k in range(cnt):
+                    st = dict(cur)
+                    if group == "sq":
+                        st["outpwm"] = 1
+                        st["outsin"] = 0
+                        st["genfreq"] = k
+                    else:
+                        st["outpwm"] = 0
+                        st["outsin"] = 1
+                        st["wavetype"] = 0
+                        st["wavescroll"] = k
+                    self._send(build_frame(T_SET, settings_to_bytes(st)))
+                    time.sleep(0.35)
+                    f_meas = self._audio_measure(0.8)
+                    f_nom = SQ_FREQ_HZ[k] if group == "sq" else WV_FREQ_HZ[k]
+                    if f_meas <= 0:
+                        self._tmsg("%s #%d 没测到频率" % (group, k))
+                        continue
+                    if not (f_nom * 0.8 <= f_meas <= f_nom * 1.25):
+                        self._tmsg("%s #%d 测量值 %.2fHz 偏离目标 %.2fHz 太多, 跳过"
+                                  % (group, k, f_meas, f_nom))
+                        continue
+                    idx = first + k
+                    cur_off = base[idx]
+                    period_now = nom[k] + cur_off
+                    need = int(round(period_now * (f_nom / f_meas)))
+                    new_off = max(-3000, min(3000, need - nom[k]))
+                    base[idx] = new_off
+                    measured += 1
+                    self._tmsg("校准 %s #%d: 实测 %.2fHz 目标 %.2fHz 偏移 %d"
+                              % (group, k, f_meas, f_nom, new_off))
+                if measured * 2 < cnt:
+                    self._tmsg("只测到 %d/%d 档, 未写入(检查音频线/幅值)" % (measured, cnt))
+                    return
+                self._write_out_off(base)
+                self._tmsg("声卡校准完成: %d/%d 档, 偏移表已写入 EEPROM" % (measured, cnt))
+            except Exception as e:
+                self._tmsg("声卡校准失败: %r" % (e,))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _read_out_off(self):
+        """同步读输出偏移表(阻塞等待 0x1D 回复)"""
+        self._outcal_vals = None
+        self._send(build_frame(int(T_OUTO)))
+        t0 = time.time()
+        while time.time() - t0 < 6.0:
+            if getattr(self, "_outcal_vals", None) is not None:
+                return list(self._outcal_vals)
+            time.sleep(0.02)
+        return None
+
+    def _write_out_off(self, vals):
+        pay = b"".join(struct.pack("<h", max(-32768, min(32767, int(v)))) for v in vals)
+        self._send(build_frame(int(T_OUTW), pay))
+        time.sleep(0.6)
 
     def _toggle_pause(self):
         """暂停/继续: 让单片机一起停/走(0x1C), 上位机界面本身不冻结"""
@@ -1509,7 +1646,9 @@ class App:
             except queue.Empty:
                 break
             handled += 1
-            if kind == "frame":
+            if kind == "msg":
+                self._msg(data)
+            elif kind == "frame":
                 self._on_frame(*data)
             elif kind == "error":
                 self._status("串口错误: %s" % data)
@@ -1585,6 +1724,8 @@ class App:
                 self._msg("Save succeed" if payload[1] else "Save failed!")
                 self._hint("")
         elif type_ == int(T_OUTO):
+            if len(payload) >= 42:
+                self._outcal_vals = list(struct.unpack("<21h", payload[:42]))
             if len(payload) >= 42 and getattr(self, "_outcal_vars", None):
                 vals = struct.unpack("<21h", payload[:42])
                 for k, v in enumerate(vals):

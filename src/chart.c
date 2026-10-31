@@ -282,7 +282,8 @@ void getWaveFreq()
             }
         }
         if (n >= 2 && last > first && DtTbl[ScaleH] > 0)
-            WaveFreq = (float)(((uint32)(n - 1) * 100000000UL)
+            /* hits count both edges -> (n-1) is half-periods */
+            WaveFreq = (float)(((uint32)(n - 1) * 50000000UL)
                                / ((uint32)(last - first) * DtTbl[ScaleH]));
     }
 }

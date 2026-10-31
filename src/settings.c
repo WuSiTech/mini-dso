@@ -351,13 +351,13 @@ void Change_Val(bit i)
         {
             if (i)
             {
-                if (++OutCalSel > 27)
+                if (++OutCalSel > 25)
                     OutCalSel = 0;
             }
             else
             {
                 if (OutCalSel == 0)
-                    OutCalSel = 27;
+                    OutCalSel = 25;
                 else
                     OutCalSel--;
             }

@@ -568,7 +568,12 @@ void OLED_DrawString_ScaleHTxt(int8 _ScaleH)
   else if (_ScaleH==18) OLED_DrawString("150us"); //18
   else if (_ScaleH==19) OLED_DrawString("100us"); //19
   else if (_ScaleH==20) OLED_DrawString("80us"); //20
-  else               OLED_DrawString("---us");  // out of bounds
+  else if (_ScaleH==21) OLED_DrawString("A1 ");
+    else if (_ScaleH==22) OLED_DrawString("B1 ");
+    else if (_ScaleH==23) OLED_DrawString("A2 ");
+    else if (_ScaleH==24) OLED_DrawString("B2 ");
+    else if (_ScaleH==25) OLED_DrawString("THR");
+    else               OLED_DrawString("---");  // out of bounds
 }
 
 /* 绘制主界面
@@ -1187,7 +1192,7 @@ void PlotOutCalPage(void)
     OLED_Set_Pos(2, 0);
     OLED_DrawString("OUT ");
     OLED_DrawNum(OutCalSel, NumDigits(OutCalSel));
-    OLED_DrawString("/27 ");
+    OLED_DrawString("/25 ");
 
     base = (OutCalSel > 2) ? (uint8)(OutCalSel - 2) : 0;
     for (slot = 0; slot < 5; slot++)
@@ -1248,7 +1253,7 @@ void PlotCalPage(void)
     OLED_Set_Pos(2, 0);
     OLED_DrawString("CAL ");
     OLED_DrawNum(CalSel, NumDigits(CalSel));
-    OLED_DrawString("/20");
+    OLED_DrawString("/25");
     OLED_Set_Pos(70, 0);
     OLED_DrawString_ScaleHTxt((int8)CalSel);
 

@@ -650,16 +650,18 @@ void PlotChart(void)
 
         /* 波形位置标尺
            Ruler for waveform position*/
+        /* 选中"滚动位置"时: 整条标尺反色(白底黑线) */
+        if (OptionInChart == 5)
+        {
+            OLED_FillRect(0, 56, 25, 63, 1);
+            OLED_Reverse(1);
+        }
         OLED_DrawHLine(0, 62, 25);
         OLED_DrawVLine(0, 60, 3);
         OLED_DrawVLine(24, 60, 3);
+        OLED_DrawVLine((TriPos + TriPosOffset - 50) * 24 / 119, 58, 4);
         if (OptionInChart == 5)
-    {
-        OLED_DrawVLine((TriPos + TriPosOffset - 50) * 24 / 119, 58, 4);
-        OLED_Reverse(0);
-    }
-    else
-        OLED_DrawVLine((TriPos + TriPosOffset - 50) * 24 / 119, 58, 4);
+            OLED_Reverse(0);
 
         /* 波形电压范围
            Voltage range of waveform*/

@@ -500,18 +500,18 @@ void Change_Val(bit i)
             }
         }
         /* 8: 串口输出开关 */
-        else if (OptionInSettings == 8)
+        else if (OptionInSettings == 9)
         {
             OutUART = !OutUART;
         }
         /* 9: 语言(中文/英文) */
-        else if (OptionInSettings == 9)
+        else if (OptionInSettings == 10)
         {
             Lang = !Lang;
             ClearDisplay = 1;
         }
         /* 10: 光标测量 -> 选中后再旋转进入光标页 */
-        else if (OptionInSettings == 10)
+        else if (OptionInSettings == 11)
         {
             CursorPage = 1;
             CurA = 30;             /* 图表宽 100 列, 默认一左一右偏中 */
@@ -522,7 +522,7 @@ void Change_Val(bit i)
             return;
         }
         /* 11: 创作者信息 -> 选中后再旋转进入信息页 */
-        else if (OptionInSettings == 11)
+        else if (OptionInSettings == 12)
         {
             InfoPage = 1;
             InfoSel = 0;
@@ -531,7 +531,7 @@ void Change_Val(bit i)
             return;
         }
         /* 12: 校准表 -> 选中后再旋转进入 */
-        else if (OptionInSettings == 12)
+        else if (OptionInSettings == 13)
         {
             CalPage = 1;
             CalSel = 0;
@@ -539,7 +539,7 @@ void Change_Val(bit i)
             return;
         }
         /* 13: 波形频率 (正弦/三角/锯齿): 6 档 */
-        else if (OptionInSettings == 13)
+        else if (OptionInSettings == 8)
         {
             if (i)
             {

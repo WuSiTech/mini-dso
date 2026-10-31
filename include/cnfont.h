@@ -96,6 +96,7 @@ const unsigned char code S_PwmFreq[] = {10, 11, 14, 15, 255};
 const unsigned char code S_PwmDuty[] = {16, 17, 18, 255};
 const unsigned char code S_WaveOut[] = {11, 19, 12, 13, 255};
 const unsigned char code S_WaveType[] = {11, 19, 20, 21, 255};
+const unsigned char code S_WaveFreq[] = {11, 19, 14, 15, 255};
 const unsigned char code S_UartOut[] = {22, 23, 12, 13, 255};
 const unsigned char code S_Lang[] = {24, 25, 255};
 const unsigned char code S_Batt[] = {26, 27, 26, 7, 255};

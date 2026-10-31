@@ -1026,31 +1026,8 @@ void PlotSettings()
                                (WaveType == 1) ? S_Tri : ((WaveType == 2) ? S_Saw : S_Sine));
                 break;
             case 8:
-                OLED_DrawCNStr(0, (uint8)y, S_UartOut);
-                OLED_DrawCNStr(4 * CN_W + 2, (uint8)y, OutUART ? S_On : S_Off);
-                break;
-            case 9:
-                OLED_DrawCNStr(0, (uint8)y, S_Lang);
-                OLED_DrawCNStr(2 * CN_W + 2, (uint8)y, Lang ? S_Cn : S_En);
-                break;
-            case 10:
-                OLED_DrawCNStr(0, (uint8)y, S_Cursor);
-                OLED_Set_Pos(4 * CN_W + 2, (uint8)(y + 2));
-                OLED_DrawString(">");
-                break;
-            case 11:
-                OLED_DrawCNStr(0, (uint8)y, S_Creator);
-                OLED_Set_Pos(5 * CN_W + 2, (uint8)(y + 2));
-                OLED_DrawString(">");
-                break;
-            case 12:
-                OLED_DrawCNStr(0, (uint8)y, S_Cal);
-                OLED_Set_Pos(3 * CN_W + 2, (uint8)(y + 2));
-                OLED_DrawString(">");
-                break;
-            case 13:
-                OLED_DrawCNStr(0, (uint8)y, S_Scroll);
-                OLED_Set_Pos(3 * CN_W + 2, (uint8)y);
+                OLED_DrawCNStr(0, (uint8)y, S_WaveFreq);
+                OLED_Set_Pos(4 * CN_W + 2, (uint8)y);
                 switch (WaveFreqIdx)
                 {
                     case 0: OLED_DrawString("9Hz  "); break;
@@ -1060,6 +1037,29 @@ void PlotSettings()
                     case 4: OLED_DrawString("141Hz"); break;
                     default: OLED_DrawString("282Hz"); break;
                 }
+                break;
+            case 9:
+                OLED_DrawCNStr(0, (uint8)y, S_UartOut);
+                OLED_DrawCNStr(4 * CN_W + 2, (uint8)y, OutUART ? S_On : S_Off);
+                break;
+            case 10:
+                OLED_DrawCNStr(0, (uint8)y, S_Lang);
+                OLED_DrawCNStr(2 * CN_W + 2, (uint8)y, Lang ? S_Cn : S_En);
+                break;
+            case 11:
+                OLED_DrawCNStr(0, (uint8)y, S_Cursor);
+                OLED_Set_Pos(4 * CN_W + 2, (uint8)(y + 2));
+                OLED_DrawString(">");
+                break;
+            case 12:
+                OLED_DrawCNStr(0, (uint8)y, S_Creator);
+                OLED_Set_Pos(5 * CN_W + 2, (uint8)(y + 2));
+                OLED_DrawString(">");
+                break;
+            case 13:
+                OLED_DrawCNStr(0, (uint8)y, S_Cal);
+                OLED_Set_Pos(3 * CN_W + 2, (uint8)(y + 2));
+                OLED_DrawString(">");
                 break;
             case 14:
                 OLED_DrawCNStr(0, (uint8)y, S_Batt);
@@ -1111,12 +1111,7 @@ void PlotSettings()
             case 5: OLED_DrawString("PWM Duty="); if (GenDuty < 10) OLED_DrawString("0"); OLED_DrawNum(GenDuty, 2); OLED_DrawString("%"); break;
             case 6: OLED_DrawString("Wave Out="); OLED_DrawString(OutSIN ? "ON " : "OFF"); break;
             case 7: OLED_DrawString("Wave Type="); OLED_DrawString(WaveTypeName[WaveType > 2 ? 0 : WaveType]); break;
-            case 8: OLED_DrawString("UART Out="); OLED_DrawString(OutUART ? "ON " : "OFF"); break;
-            case 9: OLED_DrawString("Language="); OLED_DrawString(Lang ? "CN" : "EN"); break;
-            case 10: OLED_DrawString("Cursor >"); break;
-            case 11: OLED_DrawString("Dev-er Info >"); break;
-            case 12: OLED_DrawString("Cal table >"); break;
-            case 13: OLED_DrawString("Wave freq=");
+            case 8: OLED_DrawString("Wave freq=");
                       switch (WaveFreqIdx) {
                         case 0: OLED_DrawString("9Hz"); break;
                         case 1: OLED_DrawString("18Hz"); break;
@@ -1126,6 +1121,11 @@ void PlotSettings()
                         default: OLED_DrawString("282Hz"); break;
                       }
                       break;
+            case 9: OLED_DrawString("UART Out="); OLED_DrawString(OutUART ? "ON " : "OFF"); break;
+            case 10: OLED_DrawString("Language="); OLED_DrawString(Lang ? "CN" : "EN"); break;
+            case 11: OLED_DrawString("Cursor >"); break;
+            case 12: OLED_DrawString("Dev-er Info >"); break;
+            case 13: OLED_DrawString("Cal table >"); break;
             case 14: OLED_DrawString("Batt Voltage="); OLED_DrawString(c_mv_V(VBat)); OLED_DrawString("V"); break;
             }
             OLED_Reverse(0);

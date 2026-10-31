@@ -1,0 +1,23 @@
+# 上位机
+__pycache__/
+*.py[cod]
+
+# SDCC 中间产物
+*.rel
+*.lst
+*.sym
+*.map
+*.mem
+*.lk
+*.ihx
+*.noi
+
+# 本地备份 / 个人文件
+backup/
+*.bak
+*.orig
+
+# 编辑器
+.vscode/
+.idea/
+*.swp

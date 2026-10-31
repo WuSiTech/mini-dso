@@ -9,7 +9,7 @@ STRINGS = {
     'S_WaveOut': '波形输出', 'S_WaveType': '波形类型', 'S_UartOut': '串口输出',
     'S_Lang': '语言', 'S_Batt': '电池电压',
     'S_Cursor': '光标测量', 'S_Creator': '创作者信息', 'S_Cal': '校准表',
-    'S_Ori': '原作', 'S_Dev': '开发', 'S_Proj': '项目说明及地址',
+    'S_Ori': '原作', 'S_Dev': '开发', 'S_Proj': '项目说明地址',
     'S_On': '开', 'S_Off': '关', 'S_Dots': '点', 'S_Vect': '线',
     'S_Sine': '正弦', 'S_Tri': '三角', 'S_Saw': '锯齿',
     'S_Cn': '中文', 'S_En': '英文',

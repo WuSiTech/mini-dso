@@ -588,7 +588,7 @@ void Change_Val(bit i)
             return;
         }
         /* 11: 创作者信息 -> 选中后再旋转进入信息页 */
-        else if (OptionInSettings == 12)
+        else if (OptionInSettings == 14)
         {
             InfoPage = 1;
             InfoSel = 0;
@@ -597,7 +597,15 @@ void Change_Val(bit i)
             return;
         }
         /* 12: 校准表 -> 选中后再旋转进入 */
-        else if (OptionInSettings == 14)
+        /* 13: output offset table */
+        else if (OptionInSettings == 13)
+        {
+            OutCalPage = 1;
+            OutCalSel = 0;
+            ClearDisplay = 1;
+            return;
+        }
+        else if (OptionInSettings == 12)
         {
             CalPage = 1;
             CalSel = 0;

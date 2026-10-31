@@ -37,6 +37,7 @@ static void DrawMarqueeRow(uint8 y, uint8 *str, uint8 offset);
 static void FillRowBand(uint8 y, bit white);
 void PlotCursors(void);
 void PlotCalPage(void);
+void PlotOutCalPage(void);
 
 uint16 *pADCSampling;       /* pointer to live ADC samples */
 uint16 waveBuf[SAMPLE_NUM]; /* mapped waveform data */
@@ -1059,7 +1060,7 @@ void PlotSettings()
                 OLED_DrawString(">");
                 break;
             case 12:
-                OLED_DrawCNStr(0, (uint8)y, S_Creator);
+                OLED_DrawCNStr(0, (uint8)y, S_TimeOff);
                 OLED_Set_Pos(5 * CN_W + 2, (uint8)(y + 2));
                 OLED_DrawString(">");
                 break;
@@ -1069,8 +1070,8 @@ void PlotSettings()
                 OLED_DrawString(">");
                 break;
             case 14:
-                OLED_DrawCNStr(0, (uint8)y, S_TimeOff);
-                OLED_Set_Pos(3 * CN_W + 2, (uint8)(y + 2));
+                OLED_DrawCNStr(0, (uint8)y, S_Creator);
+                OLED_Set_Pos(5 * CN_W + 2, (uint8)(y + 2));
                 OLED_DrawString(">");
                 break;
             case 15:
@@ -1136,9 +1137,9 @@ void PlotSettings()
             case 9: OLED_DrawString("UART Out="); OLED_DrawString(OutUART ? "ON " : "OFF"); break;
             case 10: OLED_DrawString("Language="); OLED_DrawString(Lang ? "CN" : "EN"); break;
             case 11: OLED_DrawString("Cursor >"); break;
-            case 12: OLED_DrawString("Dev-er Info >"); break;
+            case 12: OLED_DrawString("Time offset >"); break;
             case 13: OLED_DrawString("Wave offset >"); break;
-            case 14: OLED_DrawString("Time offset >"); break;
+            case 14: OLED_DrawString("Dev-er Info >"); break;
             case 15: OLED_DrawString("Batt Voltage="); OLED_DrawString(c_mv_V(VBat)); OLED_DrawString("V"); break;
             }
             OLED_Reverse(0);

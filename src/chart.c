@@ -220,6 +220,29 @@ void getWaveFreq()
             n_num = 3;
             break;
         }
+    /* fixed: frequency from the calibrated sample interval (CalTable), 0.01us units */
+    {
+        uint32 dt100;
+        uint16 cal = CalTable[ScaleH];
+
+        switch (ScaleH)
+        {
+        case 15: dt100 = 2000UL; break;
+        case 16: dt100 = 1200UL; break;
+        case 17: dt100 = 800UL;  break;
+        case 18: dt100 = 600UL;  break;
+        case 20: dt100 = 320UL;  break;
+        case 19: dt100 = (uint32)cal * 10000UL; break;
+        default: dt100 = ((uint32)cal * 12300UL) / 10000UL + 2000UL; break;
+        }
+        if (dt100 < 100UL)
+            dt100 = 100UL;
+        if (WaveLength == 0)
+            WaveFreq = 0;
+        else
+            WaveFreq = (float)(100000000UL / ((uint32)WaveLength * dt100));
+    }
+
 
         WaveLengthSum += WaveLength;
 

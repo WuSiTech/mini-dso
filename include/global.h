@@ -41,7 +41,11 @@ extern bit TriSlope;
 extern bit InSettings;
 extern bit WaveScroll;
 extern __xdata uint8 WaveFreqIdx;  /* 0..5: 8.8/17.6/35/70/141/282 Hz */
-extern uint8 WaveDiv;             /* ISR 分频(由 WaveFreqIdx 换算) */
+extern uint8 WaveDiv;
+extern __xdata int16 OutOff[21];  /* 0..14: square period offset, 15..20: wave step offset (0.1us) */
+extern bit OutCalPage;            /* output offset table page */
+extern uint8 OutCalSel;
+extern uint16 WaveStepQ[6];       /* precomputed step period in Q8 ticks */             /* ISR 分频(由 WaveFreqIdx 换算) */
 extern bit WaveUpdate;
 extern bit ScaleV_Auto;
 extern bit ADCComplete;
@@ -76,8 +80,8 @@ extern bit PostEepromOk, PostCalOk, PostBgvOk;   /* 开机自检结果 */
 #define GEN_TICK_US10 120   /* 信号源 1 tick = 12.0us (实测) */
 
 #define FW_VER_MAJOR 1
-#define FW_VER_MINOR 6
-#define FW_VER_PATCH 2
+#define FW_VER_MINOR 7
+#define FW_VER_PATCH 0
 #define FW_VERSION ((FW_VER_MAJOR << 8) | (FW_VER_MINOR << 4) | FW_VER_PATCH)
 
 extern __xdata uint8 InfoSel;   /* 信息页选中项: 0作者 1开发 2返回 */   /* 1: 正在显示创作者信息页 */        // P1.0 波形类型: 0正弦 1三角 2锯齿

@@ -31,7 +31,10 @@ bit TriSlope;                                              //触发方向，1：上升触
 bit TriFail;                                               //触发失败标志位
 bit WaveScroll;
 __xdata uint8 WaveFreqIdx = 2;
-uint8 WaveDiv = 32;                                            //波形滚动标志位
+__xdata int16 OutOff[21];
+uint16 WaveStepQ[6];
+bit OutCalPage = 0;
+uint8 OutCalSel = 0;                                            //波形滚动标志位
 bit WaveUpdate;                                            //更新波形标志位
 bit ScaleV_Auto;                                           //自动量程标志位
 bit ADCComplete;                                           //ADC完成采样，为单次采样服务

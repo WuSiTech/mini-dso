@@ -47,6 +47,11 @@ T_SET = 0x10
 T_SAVE = 0x11
 T_GET = 0x12
 T_INFO = 0x19       # 固件信息(版本/能力)
+T_SCRL = 0x1A       # 读滚动位置
+T_SCRS = 0x1B       # 写滚动位置
+T_RUN = 0x1C        # 运行/暂停
+T_OUTO = 0x1D       # 读输出波偏移表(21×int16)
+T_OUTW = 0x1E       # 写输出波偏移表
 
 BAUD = 115200
 BAUD_CANDIDATES = [115200, 230400, 460800, 921600, 57600, 38400, 19200,
@@ -576,7 +581,9 @@ class App:
         self.btn_lang.grid(row=2, column=0, padx=2, pady=2, sticky="ew")
         self.btn_cur = tk.Button(bgrid, text="光标", command=self._toggle_cursors)
         self.btn_cur.grid(row=2, column=1, padx=2, pady=2, sticky="ew")
-        self.btn_cal = tk.Button(bgrid, text="一键校准", command=self._calibrate)
+        self.btn_outcal = tk.Button(bgrid, text="输出波偏移", command=self._open_outcal)
+        self.btn_outcal.grid(row=3, column=0, columnspan=3, padx=2, pady=2, sticky="ew")
+        self.btn_cal = tk.Button(bgrid, text="时基校准", command=self._calibrate)
         self.btn_cal.grid(row=2, column=2, padx=2, pady=2, sticky="ew")
 
         # ---- 上部参数区(可滚动) ----
@@ -1085,6 +1092,59 @@ class App:
         except Exception:
             pass
 
+    # ---------------- 输出波偏移表(0x1D/0x1E) ----------------
+    def _open_outcal(self):
+        if getattr(self, "_outcal_win", None) is not None:
+            try:
+                self._outcal_win.lift()
+                return
+            except Exception:
+                self._outcal_win = None
+        win = tk.Toplevel(self.root)
+        win.title(self._tr("输出波偏移表") + " (0.1us)")
+        win.transient(self.root)
+        self._outcal_win = win
+        self._outcal_vars = []
+
+        head = tk.Frame(win)
+        head.pack(fill="x", padx=6, pady=4)
+        tk.Label(head, text="#  方波 15 档 / 波形 6 档", anchor="w").pack(side="left")
+
+        grid = tk.Frame(win)
+        grid.pack(padx=6, pady=2)
+        for i in range(21):
+            name = ("SQ%d" % i) if i < 15 else ("WV%d" % (i - 15))
+            tk.Label(grid, text="%2d %s" % (i, name), width=8, anchor="w").grid(row=i // 3, column=(i % 3) * 2, sticky="w")
+            v = tk.IntVar(value=0)
+            e = tk.Entry(grid, textvariable=v, width=7)
+            e.grid(row=i // 3, column=(i % 3) * 2 + 1, padx=3, pady=1)
+            self._outcal_vars.append(v)
+
+        bar = tk.Frame(win)
+        bar.pack(fill="x", padx=6, pady=6)
+        tk.Button(bar, text=self._tr("读取"), command=self._outcal_read).pack(side="left", padx=3)
+        tk.Button(bar, text=self._tr("写入 EEPROM"), command=self._outcal_write).pack(side="left", padx=3)
+        tk.Button(bar, text=self._tr("关闭"), command=self._outcal_close).pack(side="right", padx=3)
+
+    def _outcal_close(self):
+        try:
+            self._outcal_win.destroy()
+        except Exception:
+            pass
+        self._outcal_win = None
+
+    def _outcal_read(self):
+        if self.link and not self.demo:
+            self._send(build_frame(int(T_OUTO)))
+
+    def _outcal_write(self):
+        if not (self.link and not self.demo):
+            return
+        vals = [int(v.get()) for v in self._outcal_vars]
+        pay = b"".join(struct.pack("<h", max(-32768, min(32767, x))) for x in vals)
+        self._send(build_frame(int(T_OUTW), pay))
+        self._msg("输出波偏移表已写入")
+
     def _toggle_pause(self):
         """暂停/继续: 让单片机一起停/走(0x1C), 上位机界面本身不冻结"""
         self.paused = not self.paused
@@ -1523,6 +1583,11 @@ class App:
                 self.pending_save = 0.0
                 self._msg("Save succeed" if payload[1] else "Save failed!")
                 self._hint("")
+        elif type_ == int(T_OUTO):
+            if len(payload) >= 42 and getattr(self, "_outcal_vars", None):
+                vals = struct.unpack("<21h", payload[:42])
+                for k, v in enumerate(vals):
+                    self._outcal_vars[k].set(int(v))
         elif type_ == 0x1A:
             if len(payload) >= 4:
                 off = payload[0] - 256 if payload[0] > 127 else payload[0]

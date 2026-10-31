@@ -144,6 +144,20 @@ static void Key_Long(void)
         ADCInterrupt = 1;
         return;
     }
+    if (InSettings && OutCalPage)
+    {
+        EA = 0;
+        ShowSaveMsg = Save_Options() ? 1 : 0;
+        EA = 1;
+        if (!ShowSaveMsg)
+            ShowCancelMsg = 1;
+        OptionChanged = 0;
+        OutCalPage = 0;
+        ClearDisplay = 1;
+        DisplayUpdate = 1;
+        ADCInterrupt = 1;
+        return;
+    }
     if (InSettings && CalPage)
     {
         /* 校准表页长按: 立即写 EEPROM 并提示保存成功 */

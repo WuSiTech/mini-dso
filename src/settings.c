@@ -30,12 +30,35 @@
 
 /* waveform frequency divider: ISR 72.1kHz / div / 64 points -> 8.8/17.6/35/70/141/282 Hz */
 static const uint8 code WaveDivTab[6] = {128, 64, 32, 16, 8, 4};
+/* nominal table-step period (0.1us) for 8.8/17.6/35/70/141/282 Hz (64 points) */
+static const uint16 code WaveStepNom[6] = {17760, 8880, 4440, 2220, 1110, 555};
 
 void WaveFreq_Update(void)
 {
+    uint8 i;
+    uint32 q;
+
     if (WaveFreqIdx > 5)
         WaveFreqIdx = 2;
     WaveDiv = WaveDivTab[WaveFreqIdx];
+
+    /* per-step period (0.1us) plus calibration offset -> Q8 ticks */
+    for (i = 0; i < 6; i++)
+    {
+        uint16 nom = WaveStepNom[i];
+        int16 off = OutOff[15 + i];
+        int16 tot;
+
+        if (off > 3000)
+            off = 3000;
+        if (off < -3000)
+            off = -3000;
+        tot = (int16)nom + off;
+        if (tot < 100)
+            tot = 100;
+        q = ((uint32)tot * 256UL) / GEN_TICK_US10;
+        WaveStepQ[i] = (uint16)q;
+    }
 }
 
 
@@ -198,14 +221,14 @@ void change_OptionInSettings(bit i)
     if (i)
     {
         OptionInSettings++;
-        if (OptionInSettings > 14)
+        if (OptionInSettings > 15)
             OptionInSettings = 0;
     }
     else
     {
         OptionInSettings--;
         if (OptionInSettings < 0)
-            OptionInSettings = 14;
+            OptionInSettings = 15;
     }
 }
 
@@ -295,7 +318,50 @@ static uint16 CalLastMs = 0;
 
 void Change_Val(bit i)
 {
-    /* ---------------- 校准表页 ---------------- */
+    /* ---------------- 输出波偏移表页 ---------------- */
+    if (OutCalPage)
+    {
+        if (EC11PressAndRotate)
+        {
+            if (i)
+            {
+                if (++OutCalSel > 20)
+                    OutCalSel = 0;
+            }
+            else
+            {
+                if (OutCalSel == 0)
+                    OutCalSel = 20;
+                else
+                    OutCalSel--;
+            }
+        }
+        else
+        {
+            uint8 step = 1;
+            if ((uint16)(AppMs - CalLastMs) <= 60)
+                step = 8;
+            CalLastMs = AppMs;
+            if (i)
+            {
+                if (OutOff[OutCalSel] < 30000)
+                    OutOff[OutCalSel] += step;
+            }
+            else
+            {
+                if (OutOff[OutCalSel] > -30000)
+                    OutOff[OutCalSel] -= step;
+            }
+            OptionChanged = 1;
+            WaveFreq_Update();
+            SetGenParams();
+        }
+        ClearDisplay = 1;
+        DisplayUpdate = 1;
+        return;
+    }
+
+    /* ---------------- 时基偏移表页 ---------------- */
     if (CalPage)
     {
         if (EC11PressAndRotate)
@@ -531,7 +597,7 @@ void Change_Val(bit i)
             return;
         }
         /* 12: 校准表 -> 选中后再旋转进入 */
-        else if (OptionInSettings == 13)
+        else if (OptionInSettings == 14)
         {
             CalPage = 1;
             CalSel = 0;
@@ -558,7 +624,7 @@ void Change_Val(bit i)
             DisplayUpdate = 1;
         }
         /* 14: 电池电压 -> 无操作 */
-        else if (OptionInSettings == 14)
+        else if (OptionInSettings == 15)
         {
             DisplayUpdate = 1;
             return;
@@ -698,7 +764,7 @@ void check_Options()
 
 /* EEPROM 一个扇区 512 字节, 擦除是整扇区, 所以设置和校准表必须一起写
    布局: [0..17] 设置  [18..31] 0xFF  [32..33] 'C','L'  [34..75] 校准表(21x16bit LE)  [76] 校验和 */
-static __xdata uint8 EeBuf[82];
+static __xdata uint8 EeBuf[128];
 
 /* 参数无效(新片/擦除后)时载入的默认值: 两个波形输出都关 */
 static void Load_Defaults(void)
@@ -776,7 +842,20 @@ bit Save_Options()
     EeBuf[78] = 'S';
     EeBuf[79] = sum;
 
-    return EEPROM_Save(EeBuf, 81);
+    /* output offset table: 82..123, magic 'O','C', checksum */
+    for (i = 0; i < 21; i++)
+    {
+        EeBuf[82 + i * 2] = (uint8)(OutOff[i] & 0xFF);
+        EeBuf[83 + i * 2] = (uint8)((uint16)OutOff[i] >> 8);
+    }
+    EeBuf[124] = 'O';
+    EeBuf[125] = 'C';
+    sum = 0;
+    for (i = 82; i < 124; i++)
+        sum += EeBuf[i];
+    EeBuf[126] = sum;
+
+    return EEPROM_Save(EeBuf, 127);
 }
 
 void Read_Options()
@@ -784,7 +863,7 @@ void Read_Options()
     uint8 *p;
     uint8 i, sum, ok;
 
-    EEPROM_Read(EeBuf, 81);
+    EEPROM_Read(EeBuf, 127);
 
     /* 参数块校验: 擦除后全 0xFF 不能当成有效参数(否则输出全被打开) */
     sum = 0;
@@ -829,6 +908,22 @@ void Read_Options()
     Lang = *p ? 1 : 0;
 
     /* 校准表: 校验通过才覆盖默认值 */
+    /* output offsets: valid magic+checksum, otherwise zero (nominal) */
+    sum = 0;
+    for (i = 82; i < 124; i++)
+        sum += EeBuf[i];
+    if (EeBuf[124] == 'O' && EeBuf[125] == 'C' && EeBuf[126] == sum)
+    {
+        for (i = 0; i < 21; i++)
+            OutOff[i] = (int16)(((uint16)EeBuf[82 + i * 2]) | ((uint16)EeBuf[83 + i * 2] << 8));
+    }
+    else
+    {
+        for (i = 0; i < 21; i++)
+            OutOff[i] = 0;
+    }
+    WaveFreq_Update();
+
     ok = (EeBuf[32] == 'C' && EeBuf[33] == 'L');
     if (ok)
     {
@@ -872,7 +967,20 @@ void SetGenParams(void)
     if (GenDuty > 99)
         GenDuty = 99;
 
-    p10 = GenPeriodUs10[GenFreqIdx];
+    {
+        uint32 nom = GenPeriodUs10[GenFreqIdx];
+        int16 off = OutOff[GenFreqIdx];
+        long tot;
+
+        if (off > 30000)
+            off = 30000;
+        if (off < -30000)
+            off = -30000;
+        tot = (long)nom + (long)off;
+        if (tot < 100)
+            tot = 100;
+        p10 = (uint32)tot;
+    }
     tick = GEN_TICK_US10;        /* 1 tick = GEN_TICK_US10/10 us */
     pre = 1;
     while ((p10 / (tick * pre)) > 60000UL && pre < 128)

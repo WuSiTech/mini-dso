@@ -316,6 +316,40 @@ static void UART_HandleFrame(void)
         UART_SendFrame(UART_T_ACK, s, 2);
         break;
 
+    case UART_T_OUTO:   /* read output offset table: 21 x int16 */
+    {
+        uint8 oi;
+        static __xdata uint8 obuf[42];
+        for (oi = 0; oi < 21; oi++)
+        {
+            obuf[oi * 2] = (uint8)(OutOff[oi] & 0xFF);
+            obuf[oi * 2 + 1] = (uint8)((uint16)OutOff[oi] >> 8);
+        }
+        UART_SendFrame(UART_T_OUTO, obuf, 42);
+        break;
+    }
+    case UART_T_OUTW:   /* write output offset table */
+        if (FrameLen >= 42)
+        {
+            uint8 oi;
+            for (oi = 0; oi < 21; oi++)
+                OutOff[oi] = (int16)((uint16)FrameBuf[oi * 2] | ((uint16)FrameBuf[oi * 2 + 1] << 8));
+            WaveFreq_Update();
+            SetGenParams();
+            EA = 0;
+            ok = Save_Options();
+            EA = 1;
+            s[0] = 0;
+            s[1] = ok ? 1 : 0;
+        }
+        else
+        {
+            s[0] = 1;
+            s[1] = 0;
+        }
+        UART_SendFrame(UART_T_ACK, s, 2);
+        break;
+
     case UART_T_SCRL:   /* ¶Á¹ö¶¯Î»ÖÃ: [0]offset [1]TriPos [2]running [3]¿í¶È */
         s[0] = (uint8)TriPosOffset;
         s[1] = TriPos;

@@ -810,7 +810,7 @@ uint8 code SawTab[64] = {4, 8, 12, 16, 20, 24, 28, 32, 35, 39, 43, 47, 51, 55, 5
 void PWM_Isr(void) __interrupt (TIMER_1)
 {
   static __data uint8 SineIdx = 0;
-  static __data uint8 PwmCnt = 0;    /* software PWM counter (0..31) */
+  static __data uint16 WaveAcc = 0;   /* Q8 accumulator for fractional step period */
   static __data uint8 PwmVal = 128;   /* target 8-bit level */
   static __data uint16 Acc = 0;       /* PDM accumulator */
   bit PdmBit = 0;
@@ -833,9 +833,10 @@ void PWM_Isr(void) __interrupt (TIMER_1)
      (72.1kHz) with a 64-entry table stepped every 16 ticks (~70Hz).
      The on-board RP1 + L1 + C3 network averages the PDM stream, which is
      much smoother than a low-resolution PWM and immune to ISR jitter. */
-  if (++PwmCnt >= WaveDiv)
+  WaveAcc += 256;
+  if (WaveAcc >= WaveStepQ[WaveFreqIdx])
   {
-    PwmCnt = 0;
+    WaveAcc -= WaveStepQ[WaveFreqIdx];
     if (WaveType == 1)
       PwmVal = TriTab[SineIdx];
     else if (WaveType == 2)

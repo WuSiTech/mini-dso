@@ -146,7 +146,7 @@ for it in range(3):
             print("  档%2d(标称%7.1fHz): 测不到" % (FIRST + i, hz))
             continue
         # 偏移单位 0.1us: delta = (实测周期 - 目标周期) * 1e7
-        delta = int(round(1e7 * (1.0 / f - 1.0 / hz)))
+        delta = int(round(1e7 * (1.0 / hz - 1.0 / f)))
         delta = max(-300, min(300, delta))
         old = off[FIRST + i]
         off[FIRST + i] = max(-30000, min(30000, old + delta))

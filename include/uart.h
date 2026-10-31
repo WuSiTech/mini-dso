@@ -44,6 +44,8 @@
 #define UART_T_SCRS   0x1B
 #define UART_T_OUTO   0x1D   /* read output offset table (42 B) */
 #define UART_T_OUTW   0x1E   /* write output offset table (42 B) */
+#define UART_T_OTX    0x23   /* read generator coeffs: TK + 6 x WS (14 B) */
+#define UART_T_OTXW   0x24   /* write them */
 #define UART_T_DTT    0x21   /* read per-range sample intervals (84 B) */
 #define UART_T_DTTW   0x22   /* write them */
 #define UART_T_DTM    0x1F   /* read delay-model coefficients (10 B) */

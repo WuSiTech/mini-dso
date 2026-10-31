@@ -536,6 +536,36 @@ static void UART_HandleFrame(void)
         UART_SendFrame(UART_T_ACK, s, 2);
         break;
 
+    case UART_T_OTX:
+    {
+        uint8 oi;
+        s[0] = (uint8)(GenTickCal & 0xFF); s[1] = (uint8)(GenTickCal >> 8);
+        for (oi = 0; oi < 6; oi++)
+        {
+            s[2 + oi * 2] = (uint8)(WaveStepCal[oi] & 0xFF);
+            s[3 + oi * 2] = (uint8)(WaveStepCal[oi] >> 8);
+        }
+        UART_SendFrame(UART_T_OTX, s, 14);
+        break;
+    }
+    case UART_T_OTXW:
+        if (FrameLen >= 14)
+        {
+            uint8 oi;
+            GenTickCal = (uint16)FrameBuf[0] | ((uint16)FrameBuf[1] << 8);
+            for (oi = 0; oi < 6; oi++)
+                WaveStepCal[oi] = (uint16)FrameBuf[2 + oi * 2] | ((uint16)FrameBuf[3 + oi * 2] << 8);
+            SetGenParams();
+            WaveFreq_Update();
+            EA = 0;
+            ok = Save_Options();
+            EA = 1;
+            s[0] = 0; s[1] = ok ? 1 : 0;
+        }
+        else { s[0] = 1; s[1] = 0; }
+        UART_SendFrame(UART_T_ACK, s, 2);
+        break;
+
     case UART_T_SCRL:   /* ¶Á¹ö¶¯Î»ÖÃ: [0]offset [1]TriPos [2]running [3]¿í¶È */
         s[0] = (uint8)TriPosOffset;
         s[1] = TriPos;

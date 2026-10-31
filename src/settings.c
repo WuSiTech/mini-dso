@@ -178,6 +178,8 @@ void change_OptionInChart(bit i)
         if (OptionInChart < 0)
             OptionInChart = maxopt;
     }
+    ClearDisplay = 1;      /* 整屏重绘: 不让上一个选中光标留下残影 */
+    DisplayUpdate = 1;
 }
 
 void change_OptionInSettings(bit i)
@@ -551,10 +553,10 @@ void Change_Val(bit i)
        Rotate Encoder in Main interface */
     else
     {
-        /* 滚动位置: 左右滚动波形(仅暂停时可选) */
+        /* 滚动位置: 左右滚动波形(仅暂停时可选, 方向与旧滚动模式相反) */
         if (OptionInChart == 5)
         {
-            change_TriPosOffset(i);
+            change_TriPosOffset(!i);
             WaveUpdate = 1;
             DisplayUpdate = 1;
         }

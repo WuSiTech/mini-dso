@@ -1,4 +1,4 @@
-# Mini-DSO v1.8.1 — STC8A8K64D4 @ 45 MHz
+# Mini-DSO v1.8.2 — STC8A8K64D4 @ 45 MHz
 
 **中文** | [English](#english-version)
 
@@ -12,7 +12,7 @@
 **56DZ 版 STC8A8K64D4 核心板**（MCU 内部 **IRC 45 MHz**、SSD1306 128×64 SPI OLED、EC11 旋钮），
 并在此基础上做了进一步开发。
 
-本版固件为 **v1.8.1**：MCU 内部 IRC 45 MHz；Timer0 250 µs 时基（旋钮 / 按键 / 电池计时）；
+本版固件为 **v1.8.2**：MCU 内部 IRC 45 MHz；Timer0 250 µs 时基（旋钮 / 按键 / 电池计时）；
 Timer1 中断约 72.1 kHz，驱动 P1.1 方波与 P1.0 波形输出；EEPROM 用户区 1 KB（2×512 B 扇区）。
 
 ### 特色
@@ -381,7 +381,7 @@ python py\gen_cnfont.py                         # 重新生成中文字库 inclu
 #### 创作者信息页
 
 进入：设置页滚到「创作者信息」，再旋转一格进入。
-页面显示 LOGO、原作、开发、项目说明地址；本版固件在项目行显示版本号（`(v1.8.1)` / `PROJ:(v1.8.1)`）。
+页面显示 LOGO、原作、开发、项目说明地址；本版固件在项目行显示版本号（`(v1.8.2)` / `PROJ:(v1.8.2)`）。
 `按住 + 旋转` 选择条目，`旋转` 显示对应网址（长网址自动轮播），选到 `<Back` 旋转即返回；
 **短按无作用，长按**退回设置列表。
 
@@ -462,7 +462,7 @@ python py\dso_gui.py --selftest :: 协议自检
 1. 设备设置里确认 `串口输出 = ON`（默认开），USB 串口接电脑
 2. 打开软件：会**自动扫描串口并识别示波器**（发 0x19 探测），识别到就自动选好 COM
 3. 点「连接」→ 自动读回全部参数（时基/量程/触发/亮度/方波频率/波形类型/语言…），
-   状态栏显示固件版本（本版 `v1.8.1`）
+   状态栏显示固件版本（本版 `v1.8.2`）
 4. 参数面板改任何值**即时生效**（不等按钮）
 5. 点「保存到 EEPROM」把当前参数写进设备；「读取」可随时读回
 6. 「一键校准」会驱动设备输出测试方波、自动测量全部 21 档时基并写回校准表
@@ -499,7 +499,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 > ⚠️ **必须带 `--stack-auto`**：8051 直接寻址 RAM 只有 128 B，不加会报
 > `Could not get ... consecutive bytes in internal RAM for area DSEG`。
 
-资源占用（v1.8.1）：ROM 47,105 / 64,512 B (73%)、XRAM 4,399 / 8,192 B、栈 217 B。
+资源占用（v1.8.2）：ROM 47,072 / 64,512 B (73%)、XRAM 4,399 / 8,192 B、栈 217 B。
 
 中文字库改了之后重新生成：`python py\gen_cnfont.py`（生成 GBK 编码的 `include/cnfont.h`，不要手改）。
 
@@ -604,7 +604,7 @@ Port of [CreativeLau/Mini-DSO](https://github.com/CreativeLau/Mini-DSO) v0.3 to 
 **56DZ STC8A8K64D4 board** (MCU internal **IRC 45 MHz**, SSD1306 128×64 SPI OLED, EC11 encoder),
 plus further development.
 
-This release is **v1.8.1**: internal IRC 45 MHz; Timer0 250 µs tick (encoder / keys / battery);
+This release is **v1.8.2**: internal IRC 45 MHz; Timer0 250 µs tick (encoder / keys / battery);
 Timer1 ISR ≈72.1 kHz driving the P1.1 square wave and the P1.0 wave output;
 EEPROM user area 1 KB (2 × 512 B sectors).
 
@@ -996,7 +996,7 @@ The bottom line shows `dT:xxx us/ms  dV:x.xx V` (replacing the voltage-range/tim
 
 Open from settings: select “Dev-er Info >” and rotate once more. Shows the LOGO, original author,
 developer and project address; this firmware shows the version on the project row
-(`(v1.8.1)` / `PROJ:(v1.8.1)`).
+(`(v1.8.2)` / `PROJ:(v1.8.2)`).
 Press+rotate selects an entry, rotate shows the corresponding URL (marquee for long URLs); selecting
 `<Back` and rotating returns; short press does nothing, long press returns to the settings list.
 
@@ -1075,7 +1075,7 @@ python py\dso_gui.py --selftest :: protocol self-test
 1. Set `UART out = ON` on the device and connect its USB serial port
 2. Start the software – it **auto-detects the scope** (probes 0x19) and preselects the COM port
 3. Press “Connect” – all parameters are read back automatically and the firmware version
-   (`v1.8.1`) appears in the status bar
+   (`v1.8.2`) appears in the status bar
 4. Parameter changes on the right panel are applied immediately
 5. “Save to EEPROM” writes them to the device; “Read” fetches them back
 6. “One-click calibrate” measures all 21 time bases and writes the calibration table
@@ -1098,7 +1098,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 ```
 
 `--stack-auto` is mandatory (only 128 B of directly addressable IRAM).
-Current usage (v1.8.1): ROM 47,105 / 64,512 B (73%), XRAM 4,399 / 8,192 B, stack 217 B.
+Current usage (v1.8.2): ROM 47,072 / 64,512 B (73%), XRAM 4,399 / 8,192 B, stack 217 B.
 
 Regenerate the Chinese font after edits: `python py\gen_cnfont.py` (writes the GBK-encoded
 `include/cnfont.h`; do not hand-edit it).

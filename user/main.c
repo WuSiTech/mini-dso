@@ -205,7 +205,7 @@ void init()
 {
     InSettings = 0;         //初始化开机界面
     OptionInSettings = 0;   //初始化设置界面的选项编号
-    OptionInChart = 1;      //初始化主界面的选项标号(1 = 图像最大值, 轮换顺序的第一项)
+    OptionInChart = 0;      //开机默认选中: 0 = 时基(轮换顺序里 1 -> 5/0)
     WaveScroll = 0;         //清零波形滚动标志
     OptionChanged = 0;      //清零设置修改标志
     ADCRunning = 1;         //置位采样标志

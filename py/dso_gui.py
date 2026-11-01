@@ -570,8 +570,50 @@ class App:
         self._translate_widgets(to_en=False)   # 初始中文: Dots/Vect -> 点/线
         self.root.after(400, self._autodetect_port)  # 启动时自动识别示波器串口
         self.root.after(30, self._tick)
+        self._keep_awake()                      # 运行期间阻止系统息屏
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         if demo:
             self._start_demo()
+
+    # ---------------- 阻止息屏 / 退出 ----------------
+    def _keep_awake(self):
+        """Windows: 让显示器与系统保持唤醒, 直到程序退出"""
+        self._es = None
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            ES_CONTINUOUS = 0x80000000
+            ES_SYSTEM_REQUIRED = 0x00000001
+            ES_DISPLAY_REQUIRED = 0x00000002
+            self._es = ctypes.windll.kernel32
+            r = self._es.SetThreadExecutionState(
+                ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)
+            if r == 0:
+                self._es = None
+        except Exception:
+            self._es = None
+
+    def _allow_sleep(self):
+        """恢复系统默认息屏策略"""
+        try:
+            if getattr(self, "_es", None) is not None:
+                self._es.SetThreadExecutionState(0x80000000)   # ES_CONTINUOUS 单独用 = 清除
+                self._es = None
+        except Exception:
+            pass
+
+    def _on_close(self):
+        self._allow_sleep()
+        try:
+            if self.link:
+                self.link.close()
+        except Exception:
+            pass
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
 
     # ---------------- UI ----------------
     def _build_ui(self):

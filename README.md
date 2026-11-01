@@ -268,7 +268,7 @@ y = CHART_V_MIN + (plotADCMax - ADC) * (CHART_V_MAX - CHART_V_MIN)
 ### 工具
 
 ```bat
-python py\flash.py COM5 build\wusi_minidso.hex   # 烧录(自动带 EEPROM 分区, 烧完写回校准数据)
+python py\flash.py COM5 build\wusi_minidso.hex   # 烧录(1KB EEPROM 分区; 完整备份/写回用户 EEPROM 并逐字节校验)
 python py\dso_gui.py                            # 上位机(实时波形/FFT/光标/导出)
 python py\restore_all.py COM5                   # 写回 CalTable + DtTbl + TK/WS 并回读/重启校验
 python py\gen_cnfont.py                         # 重新生成中文字库 include/cnfont.h
@@ -509,10 +509,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
   点下载后**断电再上电**
 - **命令行**：`python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\wusi_minidso.hex`（需冷启动）
 - **运行中自动烧录**：`python py\flash.py COM5 build\wusi_minidso.hex`
-  （固件收到 `0x14` 后软复位进 ISP；脚本会带 `program_eeprom_split=64512`，烧完自动调
-  `restore_all.py` 写回 CalTable + DtTbl + TK/WS）
+  （固件收到 `0x14` 后软复位进 ISP；脚本带 `program_eeprom_split=64512`，并先 dump 整块 1 KB
+  用户 EEPROM，烧录时作为 EEPROM 镜像一并写回，烧后回读逐字节校验）
 
-> 烧录会整片擦除 EEPROM：设置和校准表回到默认值。
+> 烧录会整片擦除 EEPROM，但 `py/flash.py` 会先 dump 完整 1 KB 用户 EEPROM，烧录时作为 EEPROM 镜像
+> 一并写回并回读校验：设置 / CalTable / DtTbl / TK+WS / OutOff 逐字节不变
+> （只有芯片 UID 尾区 `0x1F9~0x1FF` 由 ISP 重写，校验时视为 OK）。
+> **频率**：输出频率由 EEPROM 里的 TK/WS（及方波偏移表）决定、频率读数由 DtTbl 决定，
+> 都随 EEPROM 完整保留 → 烧录前后不变；MCU 内部 IRC 的 trim 由 stcgal 按芯片内保存的
+> 目标频率重新校准（目标值不变，实测偏差通常 < 0.1%）。
 >
 > **EEPROM 用户区 = 1 KB**：默认下载选项 `program_eeprom_split=65024` 只留 0.5 KB；
 > 本项目用 **`program_eeprom_split=64512`**（65536−64512 = 1024 B = 2 × 512 B 扇区）。
@@ -537,7 +542,7 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 | 0x14 | PC→DSO | 软复位进 ISP（自动烧录用） |
 | 0x15 | PC→DSO | 设置 P1.1 测试方波分频（2×uint8；`0` 恢复正常输出，60 s 无命令自动恢复） |
 | 0x16 / 0x17 | PC↔DSO | 写 / 读时基校准表（21×uint16，42 B） |
-| 0x18 | PC→DSO | 读 IAP 地址 16 字节（诊断用，`[0..1]=地址`） |
+| 0x18 | PC→DSO | 读 IAP 任意地址 16 字节（`[0..1]=地址`）；`flash.py` 用它整块 dump 用户 EEPROM 做烧录备份 |
 | 0x19 | DSO→PC | 固件信息：`[0..2]=主/次/修订版本`（本版 `1,8,1`）、`[3]=参数块长度(22)`、`[4]=采样头长度(28)`、`[5]=能力字节`、`[6]=默认 tick(120)` |
 | 0x1A | DSO→PC | 波形滚动位置：`[0]offset(int8) [1]TriPos [2]running [3]最大偏移` |
 | 0x1B | PC→DSO | 设置滚动位置：`[0]=offset(int8)` |
@@ -879,7 +884,7 @@ y = CHART_V_MIN + (plotADCMax - ADC) * (CHART_V_MAX - CHART_V_MIN)
 ### Tools
 
 ```bat
-python py\flash.py COM5 build\wusi_minidso.hex   # flash (sets EEPROM split, then restores calibration)
+python py\flash.py COM5 build\wusi_minidso.hex   # flash (1KB EEPROM split; backs up and writes back the whole user EEPROM, verifies byte-by-byte)
 python py\dso_gui.py                            # PC host (live waveform / FFT / cursors / export)
 python py\restore_all.py COM5                   # write back CalTable + DtTbl + TK/WS and verify
 python py\gen_cnfont.py                         # regenerate the Chinese font (include/cnfont.h)
@@ -1108,9 +1113,16 @@ Regenerate the Chinese font after edits: `python py\gen_cnfont.py` (writes the G
 - STC-ISP: chip STC8A8K64D4, IRC 45 MHz, `build/wusi_minidso.hex`, power-cycle to download
 - `python -m stcgal -P stc8d -p COM5 -o program_eeprom_split=64512 build\wusi_minidso.hex`
 - `python py\flash.py COM5 build\wusi_minidso.hex` — sends `0x14` so the firmware jumps to ISP itself,
-  passes `program_eeprom_split=64512`, then restores CalTable + DtTbl + TK/WS via `restore_all.py`
+  passes `program_eeprom_split=64512`, dumps the whole 1 KB user EEPROM, flashes it back as the
+  EEPROM image and verifies it byte-by-byte
 
-Flashing erases the whole EEPROM (settings and calibration table).
+Flashing erases the whole EEPROM, but `flash.py` first dumps the full 1 KB user EEPROM and writes
+it back as the EEPROM image at flash time, then verifies it byte-by-byte (settings / CalTable /
+DtTbl / TK+WS / OutOff stay unchanged; only the chip UID tail `0x1F9~0x1FF` is rewritten by the ISP).
+**Frequency**: the generator/wave output frequency comes from TK/WS (+ output-offset table) in
+EEPROM and the frequency readout comes from DtTbl; both are preserved => unchanged across flashing.
+The MCU IRC trim is re-calibrated by stcgal to the target frequency stored in the chip (same target,
+typically < 0.1% deviation).
 **EEPROM user area = 1 KB**: the default `program_eeprom_split=65024` leaves only 0.5 KB;
 this project uses **`program_eeprom_split=64512`** (65536 − 64512 = 1024 B = 2 × 512 B sectors).
 The current data layout occupies the first 512 B sector (263 B); the second sector is unused.
@@ -1134,7 +1146,7 @@ SUM = (TYPE + LENH + LENL + ΣPAYLOAD) & 0xFF
 | 0x14 | PC→DSO | soft reset to ISP (for automatic flashing) |
 | 0x15 | PC→DSO | set P1.1 test-square divider (2×uint8; `0` restores normal output, auto-restore after 60 s) |
 | 0x16 / 0x17 | PC↔DSO | write / read calibration table (21×uint16, 42 B) |
-| 0x18 | PC→DSO | read 16 bytes at raw IAP address (diagnostics, `[0..1]=address`) |
+| 0x18 | PC→DSO | read 16 bytes at any raw IAP address (`[0..1]=address`); `flash.py` uses it to dump the whole user EEPROM before flashing |
 | 0x19 | DSO→PC | firmware info: `[0..2]=major/minor/patch` (`1,8,1` for this release), `[3]=settings length (22)`, `[4]=sample header length (28)`, `[5]=capability byte`, `[6]=default tick (120)` |
 | 0x1A | DSO→PC | scroll position: `[0]offset(int8) [1]TriPos [2]running [3]max offset` |
 | 0x1B | PC→DSO | set scroll position: `[0]=offset(int8)` |

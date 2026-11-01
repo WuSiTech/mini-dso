@@ -28,3 +28,4 @@ backup/
 build/zig-cache/
 build/zig-global-cache/
 build/_utf8/
+build/*.bin

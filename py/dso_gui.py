@@ -81,7 +81,7 @@ WV_FREQ_HZ = [8.8, 17.6, 35.2, 70.4, 140.8, 281.6]
 WV_NOM_US10 = [17760, 8880, 4440, 2220, 1110, 555]
 WAVE_FREQ_TXT = ["9Hz", "18Hz", "35Hz", "70Hz", "141Hz", "282Hz"]
 WAVE_TYPE_TXT = ["正弦 Sine", "三角 Tri", "锯齿 Saw"]
-LANG_TXT = ["中文", "English"]
+LANG_TXT = ["English", "中文"]   # 索引 = 设备 Lang 字节: 0=English, 1=中文 (固件 global.c: Lang=1 -> 中文界面)
 
 # ---- 界面中英对照(按长度从长到短匹配, 所以长词优先) ----
 TR_C2E = {
